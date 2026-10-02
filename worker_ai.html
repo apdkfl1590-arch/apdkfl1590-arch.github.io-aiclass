@@ -705,6 +705,18 @@
                 return;
             }
 
+            if (!getWorkplace()) {
+                alert('작업장소를 적어주시기 바랍니다.');
+                document.getElementById('workplaceInput').focus();
+                return;
+            }
+
+            if (!getDeliveryDate()) {
+                alert('납기일을 적어주시기 바랍니다.');
+                document.getElementById('deliveryDateInput').focus();
+                return;
+            }
+
             const workerName = getInspectorName();
             if (!workerName) {
                 alert('작업자 이름을 입력해 주세요. 이름을 입력해야 리포트가 저장됩니다.');
