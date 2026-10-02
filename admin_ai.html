@@ -109,37 +109,55 @@
             <div class="bg-slate-900/80 rounded-xl p-5 border border-slate-800 shadow-xl">
                 <h2 class="text-sm font-bold text-white uppercase tracking-wider mb-4 flex items-center gap-2">
                     <i class="fa-solid fa-sliders text-cyan-400"></i> 중요도 산출 기준 설정
+                    <button type="button" onclick="openFormulaModal()" title="산출식 보기 및 변경" aria-label="산출식 보기 및 변경" class="text-slate-400 hover:text-cyan-300 focus:outline-none focus:ring-2 focus:ring-cyan-500 rounded">
+                        <i class="fa-solid fa-gear"></i>
+                    </button>
                 </h2>
                 <p class="text-[11px] text-slate-400 mb-5 leading-relaxed">
-                    작업자가 전송한 파일의 <strong>중요도(우선순위)</strong>를 결정하는 가중치를 설정합니다. (1~10점)
+                    결함·비용·고객 가치와 AI 안전도를 반영해 검토 우선순위를 산출합니다. 가중치 1~10점
                 </p>
 
                 <div class="space-y-5">
-                    <!-- Config 1: Workplace -->
-                    <div>
-                        <div class="flex justify-between items-center mb-1">
-                            <label class="text-xs font-semibold text-slate-300"><i class="fa-solid fa-map-location-dot text-slate-500 mr-1"></i> 작업 장소</label>
-                            <span id="valWorkplace" class="text-xs font-bold text-cyan-400">5</span>
-                        </div>
-                        <input type="range" id="weightWorkplace" min="0" max="10" value="5" oninput="updateRangeVal('valWorkplace', this.value)">
-                    </div>
-                    
-                    <!-- Config 2: Work Type -->
+                    <!-- Config 1: Work Type -->
                     <div>
                         <div class="flex justify-between items-center mb-1">
                             <label class="text-xs font-semibold text-slate-300"><i class="fa-solid fa-fire text-slate-500 mr-1"></i> 작업 종류 (공법)</label>
                             <span id="valWorkType" class="text-xs font-bold text-cyan-400">5</span>
                         </div>
-                        <input type="range" id="weightWorkType" min="0" max="10" value="5" oninput="updateRangeVal('valWorkType', this.value)">
+                        <input type="range" id="weightWorkType" min="1" max="10" value="5" oninput="updateRangeVal('valWorkType', this.value)">
                     </div>
 
-                    <!-- Config 3: Delivery Date -->
+                    <!-- Config 2: Delivery Date -->
                     <div>
                         <div class="flex justify-between items-center mb-1">
                             <label class="text-xs font-semibold text-slate-300"><i class="fa-regular fa-calendar-check text-slate-500 mr-1"></i> 납기 기일 (긴급도)</label>
                             <span id="valDelivery" class="text-xs font-bold text-cyan-400">8</span>
                         </div>
-                        <input type="range" id="weightDelivery" min="0" max="10" value="8" oninput="updateRangeVal('valDelivery', this.value)">
+                        <input type="range" id="weightDelivery" min="1" max="10" value="8" oninput="updateRangeVal('valDelivery', this.value)">
+                    </div>
+
+                    <div>
+                        <div class="flex justify-between items-center mb-1">
+                            <label class="text-xs font-semibold text-slate-300"><i class="fa-solid fa-shield-halved text-slate-500 mr-1"></i> 결함 치명도</label>
+                            <span id="valDefect" class="text-xs font-bold text-cyan-400">9</span>
+                        </div>
+                        <input type="range" id="weightDefect" min="1" max="10" value="9" oninput="updateRangeVal('valDefect', this.value)">
+                    </div>
+
+                    <div>
+                        <div class="flex justify-between items-center mb-1">
+                            <label class="text-xs font-semibold text-slate-300"><i class="fa-solid fa-won-sign text-slate-500 mr-1"></i> 재작업 비용</label>
+                            <span id="valReworkCost" class="text-xs font-bold text-cyan-400">7</span>
+                        </div>
+                        <input type="range" id="weightReworkCost" min="1" max="10" value="7" oninput="updateRangeVal('valReworkCost', this.value)">
+                    </div>
+
+                    <div>
+                        <div class="flex justify-between items-center mb-1">
+                            <label class="text-xs font-semibold text-slate-300"><i class="fa-solid fa-star text-slate-500 mr-1"></i> 고객사 등급</label>
+                            <span id="valCustomer" class="text-xs font-bold text-cyan-400">6</span>
+                        </div>
+                        <input type="range" id="weightCustomer" min="1" max="10" value="6" oninput="updateRangeVal('valCustomer', this.value)">
                     </div>
                 </div>
 
@@ -147,6 +165,36 @@
                     <i class="fa-solid fa-calculator"></i>
                     <span>중요도 재계산 적용</span>
                 </button>
+            </div>
+
+            <div class="bg-slate-900/80 rounded-xl p-5 border border-slate-800 shadow-xl">
+                <h3 class="text-xs font-bold text-slate-200 uppercase tracking-wider mb-2">장소별 작업 정보</h3>
+                <p class="text-[11px] text-slate-400 mb-4">장소별 작업명, 건당 재작업비, 고객등급을 저장한 뒤 ‘장소 정보 반영’을 누르면 같은 장소의 작업자 파일에 적용됩니다.</p>
+                <div class="space-y-3">
+                    <label class="block text-[11px] text-slate-300">작업장소
+                        <input id="settingWorkplace" type="text" maxlength="40" placeholder="예: A동 1라인" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500">
+                    </label>
+                    <label class="block text-[11px] text-slate-300">현재 작업명
+                        <input id="settingJobName" type="text" maxlength="60" placeholder="예: 압력배관 플랜지 용접" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500">
+                    </label>
+                    <label class="block text-[11px] text-slate-300">건당 재작업비 (원)
+                        <input id="settingReworkCost" type="number" min="0" step="1000" placeholder="예: 150000" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500">
+                    </label>
+                    <label class="block text-[11px] text-slate-300">고객등급
+                        <select id="settingCustomerTier" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:ring-2 focus:ring-cyan-500">
+                            <option value="VIP">VIP</option>
+                            <option value="A">A</option>
+                            <option value="B">B</option>
+                            <option value="C">C</option>
+                        </select>
+                    </label>
+                    <button type="button" onclick="saveWorkplaceSettings()" class="w-full py-2 bg-cyan-700 hover:bg-cyan-600 text-white text-xs font-bold rounded-lg transition-colors flex items-center justify-center gap-2"><i class="fa-solid fa-floppy-disk"></i> 장소 정보 저장</button>
+                    <p id="lastWorkplaceSavedAt" class="text-[10px] text-slate-400">저장 기록 없음</p>
+                    <button type="button" onclick="applyWorkplaceSettings()" class="w-full py-2 bg-emerald-700 hover:bg-emerald-600 text-white text-xs font-bold rounded-lg transition-colors flex items-center justify-center gap-2"><i class="fa-solid fa-link"></i> 장소 정보 반영</button>
+                    <p id="workplaceSettingsStatus" role="status" class="text-[10px] text-emerald-400 hidden"></p>
+                    <p id="workplaceApplyStatus" role="status" class="text-[10px] text-emerald-300 hidden"></p>
+                    <div id="workplaceSettingsList" class="space-y-2 border-t border-slate-800 pt-3"></div>
+                </div>
             </div>
 
             <!-- Summary Status -->
@@ -179,11 +227,11 @@
                     <!-- Sort By -->
                     <div class="flex items-center bg-slate-950/50 rounded-lg border border-slate-700 p-1">
                         <label class="text-[10px] text-slate-400 px-2">정렬 기준</label>
-                        <select id="sortBy" onchange="renderFileList()" class="bg-transparent text-xs text-white outline-none cursor-pointer pr-2">
-                            <option value="time">시간순 (접수일시)</option>
-                            <option value="safety">안전도순 (AI점수)</option>
-                            <option value="importance">중요도순 (산출점수)</option>
-                            <option value="delivery">납기기일순 (D-Day)</option>
+                        <select id="sortBy" onchange="renderFileList()" class="bg-slate-950 text-xs text-white outline-none cursor-pointer pr-2">
+                            <option value="delivery" class="bg-slate-950 text-white">납기기일</option>
+                            <option value="defect" class="bg-slate-950 text-white">결함 치명도</option>
+                            <option value="reworkCost" class="bg-slate-950 text-white">재작업비용</option>
+                            <option value="customerTier" class="bg-slate-950 text-white">고객사 등급</option>
                         </select>
                     </div>
 
@@ -259,23 +307,249 @@
         </div>
     </div>
 
+    <div id="formulaModal" class="fixed inset-0 z-[60] hidden flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
+        <section class="bg-slate-900 rounded-xl shadow-2xl p-6 max-w-lg w-full border border-slate-700" role="dialog" aria-modal="true" aria-labelledby="formulaModalTitle">
+            <div class="flex justify-between items-center mb-4 border-b border-slate-800 pb-3">
+                <h3 id="formulaModalTitle" class="text-sm font-bold text-white flex items-center gap-2"><i class="fa-solid fa-square-root-variable text-cyan-400"></i> 우선순위 산출식</h3>
+                <button type="button" onclick="closeFormulaModal()" aria-label="닫기" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <p class="text-xs text-slate-400 mb-3">항목별 중요도와 AI 위험률, 반복 불량의 영향값을 직접 입력해 산식을 조정할 수 있습니다.</p>
+            <div class="bg-slate-950/70 border border-slate-800 rounded-lg p-3 mb-4 space-y-2">
+                <p id="baseImportanceFormulaPreview" class="text-[10px] leading-5 text-slate-300"></p>
+                <p id="aiRiskFormulaPreview" class="text-xs leading-5 text-cyan-200"></p>
+                <p id="priorityFormulaPreview" class="text-xs leading-5 text-cyan-200"></p>
+            </div>
+            <div class="grid grid-cols-2 gap-3 mb-4">
+                <label class="text-xs text-slate-300">작업 종류 가중치
+                    <input id="formulaWeightWorkType" type="number" min="1" max="10" step="1" oninput="updateFormulaPreview()" class="mt-1 w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white">
+                </label>
+                <label class="text-xs text-slate-300">납기 긴급도 가중치
+                    <input id="formulaWeightDelivery" type="number" min="1" max="10" step="1" oninput="updateFormulaPreview()" class="mt-1 w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white">
+                </label>
+                <label class="text-xs text-slate-300">결함 치명도 가중치
+                    <input id="formulaWeightDefect" type="number" min="1" max="10" step="1" oninput="updateFormulaPreview()" class="mt-1 w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white">
+                </label>
+                <label class="text-xs text-slate-300">재작업 비용 가중치
+                    <input id="formulaWeightReworkCost" type="number" min="1" max="10" step="1" oninput="updateFormulaPreview()" class="mt-1 w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white">
+                </label>
+                <label class="text-xs text-slate-300">고객사 등급 가중치
+                    <input id="formulaWeightCustomer" type="number" min="1" max="10" step="1" oninput="updateFormulaPreview()" class="mt-1 w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white">
+                </label>
+                <label class="text-xs text-slate-300">AI 위험률 계수 (0~3)
+                    <input id="aiRiskMultiplierInput" type="number" min="0" max="3" step="0.1" value="1" oninput="updateFormulaPreview()" class="mt-1 w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white">
+                </label>
+                <label class="text-xs text-slate-300 col-span-2">반복 불량 1건당 가산점 (0~20)
+                    <input id="historyBonusInput" type="number" min="0" max="20" step="1" value="5" oninput="updateFormulaPreview()" class="mt-1 w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white">
+                </label>
+            </div>
+            <div class="bg-amber-500/10 border border-amber-500/20 rounded-lg p-3">
+                <p class="text-[10px] font-bold text-amber-300 mb-1">계산 예시</p>
+                <p id="formulaExample" class="text-xs leading-5 text-slate-300"></p>
+            </div>
+            <div class="mt-6 flex justify-end gap-2">
+                <button type="button" onclick="closeFormulaModal()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-lg">취소</button>
+                <button type="button" onclick="applyFormulaSettings()" class="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-bold rounded-lg">식 적용</button>
+            </div>
+        </section>
+    </div>
+
+    <div id="deleteWorkplaceModal" class="fixed inset-0 z-[70] hidden flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
+        <section class="bg-slate-900 rounded-xl shadow-2xl p-6 max-w-sm w-full border border-slate-700" role="dialog" aria-modal="true" aria-labelledby="deleteWorkplaceTitle">
+            <h3 id="deleteWorkplaceTitle" class="text-sm font-bold text-white mb-2">장소 정보 삭제</h3>
+            <p id="deleteWorkplaceMessage" class="text-xs leading-5 text-slate-300">정말로 제거하시겠습니까?</p>
+            <div class="mt-6 flex justify-end gap-2">
+                <button type="button" onclick="closeDeleteWorkplaceConfirmation()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-lg flex items-center gap-1.5"><i class="fa-solid fa-xmark"></i> 아니요</button>
+                <button type="button" onclick="confirmDeleteWorkplace()" class="px-4 py-2 bg-rose-700 hover:bg-rose-600 text-white text-xs font-bold rounded-lg flex items-center gap-1.5"><i class="fa-solid fa-check"></i> 예</button>
+            </div>
+        </section>
+    </div>
+
+    <div id="reportModal" class="fixed inset-0 z-[60] hidden flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
+        <section class="bg-slate-900 rounded-xl shadow-2xl p-6 max-w-3xl w-full max-h-[90vh] overflow-y-auto border border-slate-700" role="dialog" aria-modal="true" aria-labelledby="reportModalTitle">
+            <div class="flex justify-between items-center mb-4 border-b border-slate-800 pb-3">
+                <div>
+                    <h3 id="reportModalTitle" class="text-base font-bold text-white">작업 품질 보고서</h3>
+                    <p id="reportModalSubtitle" class="text-xs text-slate-400 mt-1"></p>
+                </div>
+                <button type="button" onclick="closeReportModal()" aria-label="보고서 닫기" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4">
+                <div class="bg-slate-950/70 rounded-lg p-3"><span class="block text-[9px] text-slate-500">작업장소</span><span id="reportModalWorkplace" class="text-xs text-slate-200"></span></div>
+                <div class="bg-slate-950/70 rounded-lg p-3"><span class="block text-[9px] text-slate-500">납기</span><span id="reportModalDelivery" class="text-xs text-slate-200"></span></div>
+                <div class="bg-slate-950/70 rounded-lg p-3"><span class="block text-[9px] text-slate-500">작업명</span><span id="reportModalJob" class="text-xs text-slate-200"></span></div>
+                <div class="bg-slate-950/70 rounded-lg p-3"><span class="block text-[9px] text-slate-500">재작업비 · 고객등급</span><span id="reportModalBusiness" class="text-xs text-slate-200"></span></div>
+            </div>
+            <div id="reportModalMetrics" class="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4"></div>
+            <p id="reportModalDefects" class="text-xs leading-5 text-slate-300 bg-slate-950/60 rounded-lg p-3 mb-4"></p>
+            <div class="rounded-lg border border-slate-800 bg-slate-950/60 p-2 min-h-24 flex items-center justify-center">
+                <img id="reportModalImage" class="hidden max-h-[55vh] max-w-full object-contain rounded" alt="작업 용접 이미지">
+                <p id="reportModalNoImage" class="text-xs text-slate-500">저장된 작업 이미지가 없습니다.</p>
+            </div>
+        </section>
+    </div>
+
     <script>
         // Mock Data for the prototype
         const mockFiles = [
-            { id: 1, worker: "김철수", time: "2026-09-29 10:30", workplace: "A동 1라인", workType: "SMAW", deliveryDate: "2026-10-05", safetyScore: 85, daysLeft: 6, workplaceBase: 80, workTypeBase: 70 },
-            { id: 2, worker: "이영희", time: "2026-09-29 11:15", workplace: "B동 2라인", workType: "GMAW", deliveryDate: "2026-10-02", safetyScore: 60, daysLeft: 3, workplaceBase: 60, workTypeBase: 80 },
-            { id: 3, worker: "박지성", time: "2026-09-29 09:00", workplace: "A동 2라인", workType: "GTAW", deliveryDate: "2026-10-10", safetyScore: 95, daysLeft: 11, workplaceBase: 80, workTypeBase: 90 },
-            { id: 4, worker: "최동석", time: "2026-09-28 15:45", workplace: "C동 외곽", workType: "FCAW", deliveryDate: "2026-10-01", safetyScore: 45, daysLeft: 2, workplaceBase: 40, workTypeBase: 60 },
-            { id: 5, worker: "정민수", time: "2026-09-29 13:20", workplace: "B동 1라인", workType: "SMAW", deliveryDate: "2026-10-03", safetyScore: 72, daysLeft: 4, workplaceBase: 60, workTypeBase: 70 },
-            { id: 6, worker: "한소희", time: "2026-09-29 14:05", workplace: "A동 3라인", workType: "SAW", deliveryDate: "2026-09-30", safetyScore: 55, daysLeft: 1, workplaceBase: 80, workTypeBase: 85 }
+            { id: 'report-saw-example', worker: '홍길동(예시)', exampleLabel: '실제 작성예시', imageExampleType: 'porosity-rust', time: '2026-10-02 20:24', workplace: 'A동 2라인', workType: 'SAW', deliveryDate: '2026-11-22', daysLeft: 51, safetyScore: 58, workTypeBase: 85, defectType: '기공', reworkCost: null, customerTier: '미입력', reportExample: true, reportMetrics: { beadWidth: '98.6 %', roughness: 'Ra 4.3 µm', defectRate: '26.2 %', defects: '기공: 중앙부 1~3 구간 (High) · 표면 불균일: 비드 전반 (Medium)' } },
+            { id: 'report-smaw-example', worker: '홍길동(예시)', exampleLabel: '업로드 레포트 예시', imageExampleType: 'porosity-steel', time: '2026-10-02 20:23', workplace: 'A동 2라인', workType: 'SMAW', deliveryDate: '2026-11-20', daysLeft: 49, safetyScore: 64, workTypeBase: 70, defectType: '기공', reworkCost: null, customerTier: '미입력', reportExample: true, reportMetrics: { beadWidth: '88.9 %', roughness: 'Ra 12.5 µm', defectRate: '59.2 %', defects: '기공: 중앙부 1~3 구간 (High) · 표면 불균일: 비드 전반 (Medium)' } },
+            { id: 'undercut-urgent-example', worker: '홍길동(예시)', exampleLabel: '납기 경과 불량 예시', imageExampleType: 'undercut', time: '2026-10-02 17:55', workplace: 'C동 1라인', workType: 'FCAW', deliveryDate: '2026-10-01', daysLeft: -1, safetyScore: 45, workTypeBase: 60, defectType: '언더컷', reworkCost: 240000, customerTier: 'VIP', reportMetrics: { beadWidth: '72.4 %', roughness: 'Ra 8.1 µm', defectRate: '31.8 %', defects: '언더컷: 비드 경계 (High) · 기공: 후반부 (Medium)' } },
+            { id: 'normal-gmaw-example', worker: '홍길동(예시)', exampleLabel: '정상 용접 예시', imageExampleType: 'good-gmaw', time: '2026-10-02 18:10', workplace: 'B동 1라인', workType: 'GMAW', deliveryDate: '2026-11-28', daysLeft: 57, safetyScore: 94, workTypeBase: 80, defectType: '정상', reworkCost: 0, customerTier: 'A', reportMetrics: { beadWidth: '96.4 %', roughness: 'Ra 3.1 µm', defectRate: '2.4 %', defects: '비드 균일도: 중앙부 (Low) · 표면 마감: 전 구간 (Low)' } },
+            { id: 'normal-gtaw-example', worker: '홍길동(예시)', exampleLabel: '정상 용접 예시', imageExampleType: 'good-gtaw', time: '2026-10-02 17:42', workplace: 'C동 2라인', workType: 'GTAW', deliveryDate: '2026-12-03', daysLeft: 62, safetyScore: 91, workTypeBase: 90, defectType: '정상', reworkCost: 0, customerTier: 'B', reportMetrics: { beadWidth: '93.7 %', roughness: 'Ra 3.6 µm', defectRate: '3.2 %', defects: '비드 균일도: 중앙부 (Low) · 표면 마감: 전 구간 (Low)' } }
         ];
 
         let currentSortOrder = 'desc'; // desc or asc
         let filesData = [...mockFiles];
+        let workplaceSettings = {};
+        let appliedWorkplaceSettings = {};
+        let workplaceToDelete = '';
+        let aiRiskMultiplier = 1;
+        let historyBonusPerFailure = 5;
+
+        const formulaWeightFields = [
+            { input: 'formulaWeightWorkType', slider: 'weightWorkType', value: 'valWorkType' },
+            { input: 'formulaWeightDelivery', slider: 'weightDelivery', value: 'valDelivery' },
+            { input: 'formulaWeightDefect', slider: 'weightDefect', value: 'valDefect' },
+            { input: 'formulaWeightReworkCost', slider: 'weightReworkCost', value: 'valReworkCost' },
+            { input: 'formulaWeightCustomer', slider: 'weightCustomer', value: 'valCustomer' }
+        ];
+        const exampleImageCache = new Map();
+
+        function createExampleImage(kind) {
+            if (exampleImageCache.has(kind)) return exampleImageCache.get(kind);
+
+            const canvas = document.createElement('canvas');
+            canvas.width = 320;
+            canvas.height = 180;
+            const context = canvas.getContext('2d');
+            if (!context) return '';
+
+            const isRusty = kind === 'porosity-rust';
+            const background = context.createLinearGradient(0, 0, 0, canvas.height);
+            background.addColorStop(0, isRusty ? '#62584a' : '#71777a');
+            background.addColorStop(0.48, isRusty ? '#414348' : '#454b4f');
+            background.addColorStop(1, isRusty ? '#302f2b' : '#292f33');
+            context.fillStyle = background;
+            context.fillRect(0, 0, canvas.width, canvas.height);
+
+            let randomSeed = [...kind].reduce((seed, character) => (seed * 31 + character.charCodeAt(0)) >>> 0, 17);
+            const random = () => {
+                randomSeed = (randomSeed * 1664525 + 1013904223) >>> 0;
+                return randomSeed / 4294967296;
+            };
+
+            for (let speck = 0; speck < 440; speck += 1) {
+                const shade = Math.round(75 + random() * 90);
+                context.fillStyle = `rgba(${shade}, ${shade - (isRusty ? 12 : 2)}, ${shade - (isRusty ? 28 : 5)}, ${0.08 + random() * 0.22})`;
+                context.fillRect(random() * canvas.width, random() * canvas.height, 1 + random() * 3, 1 + random() * 2);
+            }
+
+            context.fillStyle = isRusty ? 'rgba(153, 91, 48, 0.32)' : 'rgba(185, 194, 198, 0.16)';
+            context.fillRect(0, 73, canvas.width, 38);
+            context.beginPath();
+            context.moveTo(-10, 93);
+            context.bezierCurveTo(65, 83, 125, 103, 190, 91);
+            context.bezierCurveTo(245, 82, 280, 99, 330, 88);
+            context.lineWidth = kind.startsWith('good') ? 21 : 25;
+            context.lineCap = 'round';
+            context.strokeStyle = kind.startsWith('good') ? '#9da8aa' : (isRusty ? '#71808a' : '#879093');
+            context.stroke();
+            context.beginPath();
+            context.moveTo(0, 92);
+            context.bezierCurveTo(72, 86, 126, 99, 191, 90);
+            context.bezierCurveTo(247, 85, 283, 97, 320, 89);
+            context.lineWidth = 4;
+            context.strokeStyle = 'rgba(224, 223, 211, 0.72)';
+            context.stroke();
+
+            if (kind.startsWith('good')) {
+                for (let bead = 0; bead < 14; bead += 1) {
+                    const xCoord = 12 + bead * 23;
+                    context.beginPath();
+                    context.ellipse(xCoord, 91 + Math.sin(bead * 0.65) * 2, 10, 5, 0, 0, Math.PI * 2);
+                    context.fillStyle = bead % 2 ? 'rgba(225, 226, 215, 0.34)' : 'rgba(35, 43, 47, 0.22)';
+                    context.fill();
+                }
+            } else {
+                const pitCount = kind === 'undercut' ? 9 : 17;
+                for (let pit = 0; pit < pitCount; pit += 1) {
+                    const xCoord = 14 + random() * 292;
+                    const yCoord = kind === 'undercut' ? 76 + random() * 34 : 79 + random() * 28;
+                    const radius = 2.2 + random() * (kind === 'undercut' ? 4 : 6);
+                    context.beginPath();
+                    context.ellipse(xCoord, yCoord, radius * 1.35, radius, random() * 0.5, 0, Math.PI * 2);
+                    context.fillStyle = 'rgba(22, 24, 25, 0.88)';
+                    context.fill();
+                    context.beginPath();
+                    context.arc(xCoord - radius * 0.3, yCoord - radius * 0.25, Math.max(1, radius * 0.35), 0, Math.PI * 2);
+                    context.fillStyle = 'rgba(209, 202, 185, 0.55)';
+                    context.fill();
+                }
+            }
+
+            const imageData = canvas.toDataURL('image/jpeg', 0.78);
+            exampleImageCache.set(kind, imageData);
+            return imageData;
+        }
 
         // UI Update for sliders
         function updateRangeVal(id, value) {
             document.getElementById(id).innerText = value;
+        }
+
+        function updateFormulaPreview() {
+            const weights = formulaWeightFields.map(field => ({
+                label: {
+                    formulaWeightWorkType: '공법점수',
+                    formulaWeightDelivery: '납기점수',
+                    formulaWeightDefect: '결함점수',
+                    formulaWeightReworkCost: '비용점수',
+                    formulaWeightCustomer: '고객등급점수'
+                }[field.input],
+                value: Math.max(1, Math.min(10, Number(document.getElementById(field.input).value) || 1))
+            }));
+            const totalWeight = weights.reduce((total, weight) => total + weight.value, 0);
+            const weightedItems = weights.map(weight => `${weight.label} × ${weight.value}`).join(' + ');
+            const riskMultiplier = Math.max(0, Math.min(3, Number(document.getElementById('aiRiskMultiplierInput').value) || 0));
+            const historyBonus = Math.max(0, Math.min(20, Number(document.getElementById('historyBonusInput').value) || 0));
+            const riskRate = Math.min(100, (100 - 40) * riskMultiplier);
+            const examplePriority = Math.min(100, Math.round(70 * riskRate / 100 + historyBonus));
+            document.getElementById('baseImportanceFormulaPreview').innerText = `기준 중요도 = (${weightedItems}) ÷ ${totalWeight}`;
+            document.getElementById('aiRiskFormulaPreview').innerText = `AI 위험률(%) = min(100, max(0, (100 - AI 안전도) × ${riskMultiplier}))`;
+            document.getElementById('priorityFormulaPreview').innerText = `최종 우선순위 = 기준 중요도 × AI 위험률 ÷ 100 + 반복 불량 횟수 × ${historyBonus}점 (최대 100점)`;
+            document.getElementById('formulaExample').innerText = `가중치 합계가 반영된 기준 중요도 70점, AI 안전도 40점, 반복 불량 1건이면 위험률은 ${riskRate}%, 최종 우선순위는 ${examplePriority}점입니다.`;
+        }
+
+        function openFormulaModal() {
+            formulaWeightFields.forEach(field => {
+                document.getElementById(field.input).value = document.getElementById(field.slider).value;
+            });
+            document.getElementById('aiRiskMultiplierInput').value = aiRiskMultiplier;
+            document.getElementById('historyBonusInput').value = historyBonusPerFailure;
+            updateFormulaPreview();
+            document.getElementById('formulaModal').classList.remove('hidden');
+        }
+
+        function closeFormulaModal() {
+            document.getElementById('formulaModal').classList.add('hidden');
+        }
+
+        function applyFormulaSettings() {
+            formulaWeightFields.forEach(field => {
+                const input = document.getElementById(field.input);
+                const weight = Math.max(1, Math.min(10, Math.round(Number(input.value) || 1)));
+                input.value = weight;
+                document.getElementById(field.slider).value = weight;
+                updateRangeVal(field.value, weight);
+            });
+            aiRiskMultiplier = Math.max(0, Math.min(3, Number(document.getElementById('aiRiskMultiplierInput').value) || 0));
+            historyBonusPerFailure = Math.max(0, Math.min(20, Number(document.getElementById('historyBonusInput').value) || 0));
+            document.getElementById('aiRiskMultiplierInput').value = aiRiskMultiplier;
+            document.getElementById('historyBonusInput').value = historyBonusPerFailure;
+            calculateImportance();
+            document.getElementById('sortBy').value = 'importance';
+            renderFileList();
+            closeFormulaModal();
         }
 
         // Set sort direction
@@ -294,38 +568,333 @@
             renderFileList();
         }
 
-        // Calculate Importance based on user settings
-        function calculateImportance() {
-            const wPlace = parseInt(document.getElementById('weightWorkplace').value);
-            const wType = parseInt(document.getElementById('weightWorkType').value);
-            const wDelivery = parseInt(document.getElementById('weightDelivery').value);
+        function getInspectionHistory() {
+            try {
+                const history = JSON.parse(localStorage.getItem('weldInspectionHistory') || '[]');
+                if (!Array.isArray(history)) return [];
+                const retainedHistory = history.filter(entry => {
+                    if (!entry || typeof entry !== 'object') return false;
+                    const isWorkerFile = Boolean(entry.workplace || entry.deliveryDate);
+                    return !isWorkerFile || Boolean(entry.reportThumbnail);
+                });
+                if (retainedHistory.length !== history.length) {
+                    localStorage.setItem('weldInspectionHistory', JSON.stringify(retainedHistory));
+                }
+                return retainedHistory;
+            } catch {
+                return [];
+            }
+        }
 
-            // Avoid division by zero
-            const totalWeight = wPlace + wType + wDelivery || 1; 
+        function normalizeWorkplaceName(workplace) {
+            return String(workplace || '').trim().toLocaleLowerCase('ko-KR');
+        }
+
+        function normalizeWorkplaceSettings(settings) {
+            return Object.entries(settings).reduce((normalized, [workplace, setting]) => {
+                const existingKey = Object.keys(normalized).find(key => normalizeWorkplaceName(key) === normalizeWorkplaceName(workplace));
+                normalized[existingKey || workplace.trim()] = setting;
+                return normalized;
+            }, {});
+        }
+
+        function getWorkplaceSetting(settings, workplace) {
+            const match = Object.entries(settings).find(([savedWorkplace]) => normalizeWorkplaceName(savedWorkplace) === normalizeWorkplaceName(workplace));
+            return match ? match[1] : null;
+        }
+
+        function loadWorkplaceSettings() {
+            try {
+                const settings = JSON.parse(localStorage.getItem('weldWorkplaceSettings') || '{}');
+                return settings && typeof settings === 'object' && !Array.isArray(settings) ? normalizeWorkplaceSettings(settings) : {};
+            } catch {
+                return {};
+            }
+        }
+
+        function loadAppliedWorkplaceSettings() {
+            try {
+                const settings = JSON.parse(localStorage.getItem('weldAppliedWorkplaceSettings') || '{}');
+                return settings && typeof settings === 'object' && !Array.isArray(settings) ? normalizeWorkplaceSettings(settings) : {};
+            } catch {
+                return {};
+            }
+        }
+
+        function formatWorkplaceTime(value) {
+            const date = value ? new Date(value) : null;
+            return date && !Number.isNaN(date.getTime()) ? date.toLocaleString('ko-KR') : '시간 기록 없음';
+        }
+
+        function getDaysLeft(deliveryDate) {
+            if (!deliveryDate) return null;
+            const dueDate = new Date(`${deliveryDate}T00:00:00`);
+            if (Number.isNaN(dueDate.getTime())) return null;
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            return Math.ceil((dueDate - today) / 86400000);
+        }
+
+        function getReportDefectType(entry) {
+            const defectText = (entry.defectTypes || []).join(' ');
+            if (/언더컷|undercut/i.test(defectText)) return '언더컷';
+            if (/기공|porosity/i.test(defectText)) return '기공';
+            if (/스패터|spatter/i.test(defectText)) return '스패터';
+            return Number(entry.score) >= 80 ? '정상' : '기타';
+        }
+
+        function buildWorkerReportFiles(history) {
+            const processScores = { SMAW: 70, GMAW: 80, GTAW: 90, FCAW: 60, SAW: 85 };
+            return history.filter(entry => entry.workplace || entry.deliveryDate).map((entry, index) => {
+                const createdAt = entry.createdAt ? new Date(entry.createdAt) : null;
+                const time = createdAt && !Number.isNaN(createdAt.getTime())
+                    ? `${createdAt.toISOString().slice(0, 10)} ${createdAt.toTimeString().slice(0, 5)}`
+                    : entry.date || '기록일 미상';
+                return {
+                    id: `report-${entry.createdAt || index}`,
+                    worker: entry.inspector || '미기재',
+                    time,
+                    workplace: entry.workplace || '미기재',
+                    jobName: '',
+                    workType: entry.process || '미기재',
+                    deliveryDate: entry.deliveryDate || null,
+                    daysLeft: getDaysLeft(entry.deliveryDate),
+                    safetyScore: Number(entry.score) || 0,
+                    workTypeBase: processScores[entry.process] || 50,
+                    defectType: getReportDefectType(entry),
+                    reworkCost: null,
+                    customerTier: '미입력',
+                    lotId: entry.lotId || '',
+                    reportMetrics: entry.reportMetrics || null,
+                    reportThumbnail: entry.reportThumbnail || ''
+                };
+            });
+        }
+
+        function openReportModal(fileId) {
+            const file = filesData.find(item => String(item.id) === String(fileId));
+            if (!file) return;
+
+            document.getElementById('reportModalTitle').textContent = file.exampleLabel ? `${file.exampleLabel} · ${file.worker}` : `${file.worker} 작업 품질 보고서`;
+            document.getElementById('reportModalSubtitle').textContent = `${file.time} · ${file.workType} · ${file.reportMetrics ? '품질 점수' : '안전도'} ${file.safetyScore}점`;
+            document.getElementById('reportModalWorkplace').textContent = file.workplace || '미입력';
+            document.getElementById('reportModalDelivery').textContent = file.deliveryDate || '미입력';
+            document.getElementById('reportModalJob').textContent = file.jobName || '작업 미등록';
+            document.getElementById('reportModalBusiness').textContent = `${Number.isFinite(file.reworkCost) ? `${file.reworkCost.toLocaleString()}원` : '미산정'} · ${file.customerTier || '미입력'}`;
+            document.getElementById('reportModalDefects').textContent = file.reportMetrics?.defects || `${file.defectType || '결함 정보 없음'} · 결함 상세가 저장되지 않았습니다.`;
+
+            const metricsContainer = document.getElementById('reportModalMetrics');
+            metricsContainer.replaceChildren();
+            const metrics = [
+                ['점수', `${file.safetyScore}점`],
+                ['비드 폭', file.reportMetrics?.beadWidth || '미기록'],
+                ['표면 조도', file.reportMetrics?.roughness || '미기록'],
+                ['결함율', file.reportMetrics?.defectRate || '미기록']
+            ];
+            metrics.forEach(([label, value]) => {
+                const metric = document.createElement('div');
+                metric.className = 'bg-slate-950/70 rounded-lg p-3';
+                const caption = document.createElement('span');
+                caption.className = 'block text-[9px] text-slate-500';
+                caption.textContent = label;
+                const content = document.createElement('span');
+                content.className = 'text-xs font-semibold text-cyan-300';
+                content.textContent = value;
+                metric.append(caption, content);
+                metricsContainer.appendChild(metric);
+            });
+
+            const image = document.getElementById('reportModalImage');
+            const noImage = document.getElementById('reportModalNoImage');
+            const imageSource = file.reportThumbnail || (file.imageExampleType ? createExampleImage(file.imageExampleType) : '');
+            image.classList.toggle('hidden', !imageSource);
+            noImage.classList.toggle('hidden', Boolean(imageSource));
+            image.alt = file.reportThumbnail ? '작업자가 업로드한 용접 이미지' : '생성된 용접 이미지 예시';
+            if (imageSource) image.src = imageSource;
+            else image.removeAttribute('src');
+            document.getElementById('reportModal').classList.remove('hidden');
+        }
+
+        function closeReportModal() {
+            document.getElementById('reportModal').classList.add('hidden');
+        }
+
+        function saveWorkplaceSettings() {
+            const workplace = document.getElementById('settingWorkplace').value.trim();
+            const jobName = document.getElementById('settingJobName').value.trim();
+            const reworkCostInput = document.getElementById('settingReworkCost').value.trim();
+            const reworkCost = Number(reworkCostInput);
+            const customerTier = document.getElementById('settingCustomerTier').value;
+            if (!workplace || !jobName || !reworkCostInput || !Number.isFinite(reworkCost) || reworkCost < 0) {
+                alert('작업장소, 작업명, 올바른 재작업비를 입력해 주세요.');
+                return;
+            }
+
+            const savedAt = new Date().toISOString();
+            const existingKey = Object.keys(workplaceSettings).find(key => normalizeWorkplaceName(key) === normalizeWorkplaceName(workplace));
+            const savedWorkplace = existingKey || workplace;
+            workplaceSettings[savedWorkplace] = { jobName, reworkCost, customerTier, savedAt };
+            localStorage.setItem('weldWorkplaceSettings', JSON.stringify(workplaceSettings));
+            renderWorkplaceSettings();
+            const status = document.getElementById('workplaceSettingsStatus');
+            status.textContent = `${savedWorkplace} 저장 완료 · ${formatWorkplaceTime(savedAt)}. 적용하려면 아래 반영 버튼을 누르세요.`;
+            status.classList.remove('hidden');
+        }
+
+        function requestDeleteWorkplace(workplace) {
+            workplaceToDelete = workplace;
+            document.getElementById('deleteWorkplaceMessage').textContent = `정말로 제거하시겠습니까? ${workplace}의 저장 및 반영 정보가 함께 삭제됩니다.`;
+            document.getElementById('deleteWorkplaceModal').classList.remove('hidden');
+        }
+
+        function closeDeleteWorkplaceConfirmation() {
+            workplaceToDelete = '';
+            document.getElementById('deleteWorkplaceModal').classList.add('hidden');
+        }
+
+        function confirmDeleteWorkplace() {
+            const normalizedName = normalizeWorkplaceName(workplaceToDelete);
+            Object.keys(workplaceSettings).filter(key => normalizeWorkplaceName(key) === normalizedName).forEach(key => delete workplaceSettings[key]);
+            Object.keys(appliedWorkplaceSettings).filter(key => normalizeWorkplaceName(key) === normalizedName).forEach(key => delete appliedWorkplaceSettings[key]);
+            localStorage.setItem('weldWorkplaceSettings', JSON.stringify(workplaceSettings));
+            localStorage.setItem('weldAppliedWorkplaceSettings', JSON.stringify(appliedWorkplaceSettings));
+            if (Object.keys(appliedWorkplaceSettings).length) {
+                localStorage.setItem('weldWorkplaceAppliedAt', new Date().toISOString());
+            } else {
+                localStorage.removeItem('weldWorkplaceAppliedAt');
+            }
+            closeDeleteWorkplaceConfirmation();
+            renderWorkplaceSettings();
+            calculateImportance();
+            renderFileList();
+        }
+
+        function applyWorkplaceSettings() {
+            workplaceSettings = loadWorkplaceSettings();
+            const settingCount = Object.keys(workplaceSettings).length;
+            const status = document.getElementById('workplaceApplyStatus');
+            if (!settingCount) {
+                status.textContent = '먼저 장소 정보를 저장해 주세요.';
+                status.classList.remove('hidden');
+                return;
+            }
+
+            appliedWorkplaceSettings = { ...workplaceSettings };
+            const appliedAt = new Date().toISOString();
+            localStorage.setItem('weldAppliedWorkplaceSettings', JSON.stringify(appliedWorkplaceSettings));
+            localStorage.setItem('weldWorkplaceAppliedAt', appliedAt);
+            calculateImportance();
+            renderFileList();
+            const matchingFiles = filesData.filter(file => appliedWorkplaceSettings[file.workplace]).length;
+            status.textContent = `장소 설정 ${settingCount}개를 반영했습니다. 일치한 작업자 파일 ${matchingFiles}건 · ${formatWorkplaceTime(appliedAt)}`;
+            status.classList.remove('hidden');
+        }
+
+        function renderWorkplaceSettings() {
+            const container = document.getElementById('workplaceSettingsList');
+            if (!container) return;
+            container.replaceChildren();
+            const entries = Object.entries(workplaceSettings);
+            const latestSavedAt = entries.reduce((latest, [, setting]) => {
+                return setting.savedAt && (!latest || setting.savedAt > latest) ? setting.savedAt : latest;
+            }, '');
+            document.getElementById('lastWorkplaceSavedAt').textContent = latestSavedAt
+                ? `최근 저장: ${formatWorkplaceTime(latestSavedAt)}`
+                : '저장 기록 없음';
+            if (!entries.length) {
+                const empty = document.createElement('p');
+                empty.className = 'text-[10px] text-slate-500';
+                empty.textContent = '저장된 장소 정보가 없습니다.';
+                container.appendChild(empty);
+                return;
+            }
+
+            entries.sort(([placeA], [placeB]) => placeA.localeCompare(placeB, 'ko')).forEach(([workplace, setting]) => {
+                const row = document.createElement('div');
+                row.className = 'flex items-center justify-between gap-2 text-[10px] bg-slate-950/60 rounded-lg p-2 border border-slate-800';
+                const details = document.createElement('span');
+                details.className = 'min-w-0 text-slate-300';
+                details.textContent = `${workplace} · ${setting.jobName} · ${Number(setting.reworkCost).toLocaleString()}원 · ${setting.customerTier} · ${formatWorkplaceTime(setting.savedAt)}`;
+                const actions = document.createElement('div');
+                actions.className = 'shrink-0 flex items-center gap-2';
+                const editButton = document.createElement('button');
+                editButton.type = 'button';
+                editButton.className = 'text-cyan-300 hover:text-white';
+                editButton.textContent = '불러오기';
+                editButton.addEventListener('click', () => {
+                    document.getElementById('settingWorkplace').value = workplace;
+                    document.getElementById('settingJobName').value = setting.jobName;
+                    document.getElementById('settingReworkCost').value = setting.reworkCost;
+                    document.getElementById('settingCustomerTier').value = setting.customerTier;
+                });
+                const deleteButton = document.createElement('button');
+                deleteButton.type = 'button';
+                deleteButton.className = 'text-rose-400 hover:text-rose-300';
+                deleteButton.setAttribute('aria-label', `${workplace} 삭제`);
+                deleteButton.title = '삭제';
+                deleteButton.innerHTML = '<i class="fa-solid fa-trash"></i> 삭제';
+                deleteButton.addEventListener('click', () => requestDeleteWorkplace(workplace));
+                actions.append(editButton, deleteButton);
+                row.append(details, actions);
+                container.appendChild(row);
+            });
+        }
+
+        function getHistoricalFailureCount(file, history) {
+            const cutoff = Date.now() - 30 * 24 * 60 * 60 * 1000;
+            return history.filter(entry => {
+                const sameWorker = entry.inspector && entry.inspector === file.worker;
+                const sameLot = entry.lotId && entry.lotId === file.lotId;
+                if (!sameWorker && !sameLot) return false;
+                if (entry.createdAt && new Date(entry.createdAt).getTime() < cutoff) return false;
+                return Number(entry.score) < 80 || /FAIL|REWORK|불합격|재작업/i.test(entry.result || '');
+            }).length;
+        }
+
+        function calculateImportance() {
+            const inspectionHistory = getInspectionHistory();
+            filesData = [...mockFiles, ...buildWorkerReportFiles(inspectionHistory)];
+            filesData.forEach(file => {
+                const setting = getWorkplaceSetting(appliedWorkplaceSettings, file.workplace);
+                if (!setting) return;
+                file.jobName = setting.jobName;
+                file.reworkCost = Number(setting.reworkCost);
+                file.customerTier = setting.customerTier;
+            });
+            const weights = {
+                workType: Number(document.getElementById('weightWorkType').value),
+                delivery: Number(document.getElementById('weightDelivery').value),
+                defect: Number(document.getElementById('weightDefect').value),
+                reworkCost: Number(document.getElementById('weightReworkCost').value),
+                customer: Number(document.getElementById('weightCustomer').value)
+            };
+            const totalWeight = Object.values(weights).reduce((total, weight) => total + weight, 0);
+            const defectSeverity = { 정상: 10, 스패터: 35, 기공: 90, 언더컷: 100 };
+            const customerValue = { C: 25, B: 50, A: 75, VIP: 100 };
 
             filesData.forEach(file => {
-                // 납기가 짧을수록 점수 높음 (최대 15일 기준)
-                let deliveryScore = Math.max(0, 15 - file.daysLeft) * (100/15); 
-                
-                // 가중치 적용
-                let rawScore = (file.workplaceBase * wPlace) + (file.workTypeBase * wType) + (deliveryScore * wDelivery);
-                
-                // 100점 만점으로 정규화
-                file.importanceScore = Math.round(rawScore / totalWeight);
+                const factors = {
+                    workType: file.workTypeBase,
+                    delivery: Number.isFinite(file.daysLeft) ? Math.max(0, Math.min(100, (15 - file.daysLeft) * (100 / 15))) : 0,
+                    defect: defectSeverity[file.defectType] || 50,
+                    reworkCost: Number.isFinite(file.reworkCost) ? Math.min(100, file.reworkCost / 2500) : 0,
+                    customer: customerValue[String(file.customerTier || '').toUpperCase()] ?? 50
+                };
+                const weightedImportance = Object.keys(weights).reduce((total, key) => total + factors[key] * weights[key], 0) / totalWeight;
+                file.importanceScore = Math.round(weightedImportance);
+                file.historyFailureCount = getHistoricalFailureCount(file, inspectionHistory);
+                file.historyBoost = Math.min(20, file.historyFailureCount * historyBonusPerFailure);
+                file.aiRiskRate = Math.min(100, Math.max(0, (100 - file.safetyScore) * aiRiskMultiplier));
+                const priorityScore = weightedImportance * file.aiRiskRate / 100 + file.historyBoost;
+                file.priorityScore = Math.min(100, Math.max(0, Math.round(priorityScore)));
             });
         }
 
         function applyImportanceSettings() {
             calculateImportance();
             
-            // If already sorting by importance, re-render
-            const sortBy = document.getElementById('sortBy').value;
-            if(sortBy === 'importance') {
-                renderFileList();
-            } else {
-                document.getElementById('sortBy').value = 'importance';
-                renderFileList();
-            }
+            document.getElementById('sortBy').value = 'importance';
+            renderFileList();
             
             // Visual feedback
             const btn = document.querySelector('button[onclick="applyImportanceSettings()"]');
@@ -344,22 +913,28 @@
             
             // 공통 정렬 함수
             const sortFunction = (a, b) => {
-                let valA, valB;
-                
-                if (sortBy === 'time') {
-                    // String comparison for time (YYYY-MM-DD HH:MM)
-                    valA = a.time;
-                    valB = b.time;
-                } else if (sortBy === 'safety') {
-                    valA = a.safetyScore;
-                    valB = b.safetyScore;
-                } else if (sortBy === 'importance') {
-                    valA = a.importanceScore;
-                    valB = b.importanceScore;
-                } else if (sortBy === 'delivery') {
+                const defectSeverity = { 정상: 0, 스패터: 1, 기타: 2, 기공: 3, 언더컷: 4 };
+                const customerRank = { C: 1, B: 2, A: 3, VIP: 4 };
+                let valA;
+                let valB;
+
+                if (sortBy === 'delivery') {
                     valA = a.daysLeft;
                     valB = b.daysLeft;
+                } else if (sortBy === 'defect') {
+                    valA = defectSeverity[a.defectType] ?? 2;
+                    valB = defectSeverity[b.defectType] ?? 2;
+                } else if (sortBy === 'reworkCost') {
+                    valA = a.reworkCost;
+                    valB = b.reworkCost;
+                } else if (sortBy === 'customerTier') {
+                    valA = customerRank[String(a.customerTier || '').toUpperCase()] ?? 0;
+                    valB = customerRank[String(b.customerTier || '').toUpperCase()] ?? 0;
                 }
+
+                const missingA = valA === null || valA === undefined || !Number.isFinite(valA);
+                const missingB = valB === null || valB === undefined || !Number.isFinite(valB);
+                if (missingA || missingB) return missingA === missingB ? 0 : (missingA ? 1 : -1);
 
                 if (valA < valB) return currentSortOrder === 'asc' ? -1 : 1;
                 if (valA > valB) return currentSortOrder === 'asc' ? 1 : -1;
@@ -369,6 +944,10 @@
             // 우선적으로 용접 상태별 분류 (안전도 80 미만: 문제/불량, 80 이상: 양호)
             const badFiles = filesData.filter(f => f.safetyScore < 80);
             const goodFiles = filesData.filter(f => f.safetyScore >= 80);
+            const criticalIds = new Set([...badFiles]
+                .sort((a, b) => b.priorityScore - a.priorityScore)
+                .slice(0, Math.max(1, Math.ceil(badFiles.length * 0.1)))
+                .map(file => file.id));
 
             // 각각 그룹 내에서 정렬 수행
             badFiles.sort(sortFunction);
@@ -392,6 +971,9 @@
             
             // 카드 생성 헬퍼 함수
             const createCardHTML = (file) => {
+                const isCritical = file.priorityScore >= 70 || criticalIds.has(file.id);
+                const isPastDue = Number.isFinite(file.daysLeft) && file.daysLeft < 0;
+                const imageSource = file.reportThumbnail || (file.imageExampleType ? createExampleImage(file.imageExampleType) : '');
                 // Color coding for safety
                 let safetyColor = 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20';
                 let statusIcon = '<i class="fa-solid fa-circle-check text-emerald-500"></i>';
@@ -405,20 +987,21 @@
 
                 // Color coding for importance
                 let impColor = 'text-slate-300 bg-slate-800';
-                if(file.importanceScore >= 80) impColor = 'text-rose-400 bg-rose-500/20 font-bold';
-                else if(file.importanceScore >= 60) impColor = 'text-amber-400 bg-amber-500/20';
+                if(file.priorityScore >= 80) impColor = 'text-rose-400 bg-rose-500/20 font-bold';
+                else if(file.priorityScore >= 60) impColor = 'text-amber-400 bg-amber-500/20';
 
                 return `
                     <div class="bg-slate-900 border border-slate-700 rounded-xl p-4 shadow-lg flex flex-col justify-between hover:border-slate-500 transition-colors">
                         <div class="flex justify-between items-start mb-3">
                             <div class="flex items-center gap-3">
-                                <div class="w-12 h-12 bg-slate-800 rounded-lg flex items-center justify-center border border-slate-700 text-slate-400 text-xl shadow-inner">
-                                    <i class="fa-solid fa-image"></i>
-                                </div>
+                                ${imageSource
+                                    ? `<div class="relative w-24 h-16 shrink-0"><img src="${imageSource}" alt="${file.reportThumbnail ? `${file.workplace} 작업 이미지` : '용접 작업 이미지 예시'}" loading="eager" class="w-full h-full object-cover rounded-lg border border-slate-700 bg-slate-800">${file.reportThumbnail ? '' : '<span class="absolute bottom-0 inset-x-0 bg-slate-950/80 text-center text-[8px] text-cyan-200">이미지 예시</span>'}</div>`
+                                    : `<div class="w-16 h-16 bg-slate-800 rounded-lg flex flex-col items-center justify-center border border-slate-700 text-slate-500 text-lg"><i class="fa-solid fa-image"></i><span class="text-[8px]">이미지 미포함</span></div>`}
                                 <div>
                                     <h4 class="font-bold text-white text-sm flex items-center gap-1.5">
                                         ${file.worker} 작업자
                                         ${statusIcon}
+                                        ${file.exampleLabel || (file.reportExample ? '출력 레포트 예시' : '') ? `<span class="px-1.5 py-0.5 rounded text-[9px] text-cyan-200 bg-cyan-500/15 border border-cyan-500/30">${file.exampleLabel || '출력 레포트 예시'}</span>` : ''}
                                     </h4>
                                     <span class="text-[10px] text-slate-400"><i class="fa-regular fa-clock"></i> ${file.time} 접수</span>
                                 </div>
@@ -426,35 +1009,58 @@
                             
                             <!-- Badges -->
                             <div class="flex flex-col gap-1 items-end">
+                                ${isCritical ? '<span class="px-2 py-0.5 rounded text-[10px] font-bold text-rose-200 bg-rose-600/30 border border-rose-500/60"><i class="fa-solid fa-bell mr-1"></i>긴급 검토</span>' : ''}
                                 <span class="px-2 py-0.5 rounded text-[10px] border ${safetyColor}">
-                                    안전도: <strong>${file.safetyScore}점</strong>
+                                    ${file.reportMetrics ? '품질 점수' : '안전도'}: <strong>${file.safetyScore}점</strong>
                                 </span>
                                 <span class="px-2 py-0.5 rounded text-[10px] ${impColor}">
-                                    중요도: <strong>${file.importanceScore}점</strong>
+                                    우선순위: <strong>${file.priorityScore}점</strong>
                                 </span>
+                                <span class="text-[9px] text-slate-500">기준 ${file.importanceScore}점 · 반복 불량 ${file.historyFailureCount}건</span>
                             </div>
                         </div>
 
+                        ${isPastDue ? '<div class="mb-3 px-3 py-2 rounded-lg bg-rose-500/10 border border-rose-500/30 text-[11px] font-semibold text-rose-300"><i class="fa-solid fa-triangle-exclamation mr-1"></i>종료된 작업일 수 있습니다</div>' : ''}
+
                         <!-- Meta info -->
-                        <div class="grid grid-cols-3 gap-2 mb-4 bg-slate-950/50 p-2 rounded-lg border border-slate-800">
+                        <div class="grid grid-cols-4 gap-2 mb-4 bg-slate-950/50 p-2 rounded-lg border border-slate-800">
                             <div class="text-center border-r border-slate-700">
                                 <span class="block text-[9px] text-slate-500 uppercase">장소</span>
                                 <span class="text-xs font-semibold text-slate-300 truncate">${file.workplace}</span>
+                                <span class="block text-[9px] text-cyan-300 truncate">${file.jobName || '작업 미등록'}</span>
                             </div>
                             <div class="text-center border-r border-slate-700">
                                 <span class="block text-[9px] text-slate-500 uppercase">공법</span>
                                 <span class="text-xs font-semibold text-slate-300 truncate">${file.workType}</span>
                             </div>
                             <div class="text-center">
-                                <span class="block text-[9px] text-slate-500 uppercase">납기</span>
-                                <span class="text-xs font-semibold text-rose-300 truncate">D-${file.daysLeft}</span>
+                                <span class="block text-[9px] text-slate-500 uppercase">결함 · 재작업</span>
+                                <span class="text-[10px] font-semibold text-slate-300 truncate">${file.defectType} · ${Number.isFinite(file.reworkCost) ? `${file.reworkCost.toLocaleString()}원` : '비용 미산정'}</span>
+                            </div>
+                            <div class="text-center">
+                                <span class="block text-[9px] text-slate-500 uppercase">고객 · 납기</span>
+                                <span class="text-[10px] font-semibold text-rose-300 truncate">${file.customerTier} · ${Number.isFinite(file.daysLeft) ? (isPastDue ? `납기 ${Math.abs(file.daysLeft)}일 경과` : `D-${file.daysLeft}`) : '납기 미입력'}</span>
                             </div>
                         </div>
 
+                        ${file.reportMetrics ? `
+                            <div class="grid grid-cols-3 gap-2 mb-3 bg-cyan-950/30 p-2 rounded-lg border border-cyan-800/50">
+                                <div class="text-center"><span class="block text-[9px] text-slate-500">비드 폭</span><span class="text-[10px] font-semibold text-cyan-300">${file.reportMetrics.beadWidth}</span></div>
+                                <div class="text-center"><span class="block text-[9px] text-slate-500">표면 조도</span><span class="text-[10px] font-semibold text-amber-300">${file.reportMetrics.roughness}</span></div>
+                                <div class="text-center"><span class="block text-[9px] text-slate-500">결함율</span><span class="text-[10px] font-semibold text-rose-300">${file.reportMetrics.defectRate}</span></div>
+                                <p class="col-span-3 text-[10px] leading-4 text-slate-300">${file.reportMetrics.defects}</p>
+                            </div>
+                        ` : ''}
+
                         <!-- Action -->
-                        <button onclick="openFeedbackModal('${file.worker}', '${file.workType}', '${file.workplace}')" class="w-full py-2 bg-slate-800 hover:bg-slate-700 text-white text-xs font-semibold rounded border border-slate-700 transition flex items-center justify-center gap-1.5">
-                            <i class="fa-solid fa-magnifying-glass-chart text-cyan-400"></i> 검토 및 피드백 작성
-                        </button>
+                        <div class="grid grid-cols-2 gap-2">
+                            <button type="button" onclick="openReportModal('${file.id}')" class="py-2 bg-cyan-800 hover:bg-cyan-700 text-white text-xs font-semibold rounded border border-cyan-700 transition flex items-center justify-center gap-1.5">
+                                <i class="fa-solid fa-file-lines"></i> 보고서 열기
+                            </button>
+                            <button type="button" onclick="openFeedbackModal('${file.worker}', '${file.workType}', '${file.workplace}')" class="py-2 bg-slate-800 hover:bg-slate-700 text-white text-xs font-semibold rounded border border-slate-700 transition flex items-center justify-center gap-1.5">
+                                <i class="fa-solid fa-magnifying-glass-chart text-cyan-400"></i> 검토 및 피드백
+                            </button>
+                        </div>
                     </div>
                 `;
             };
@@ -502,6 +1108,15 @@
 
         // Initialize on load
         window.onload = () => {
+            workplaceSettings = loadWorkplaceSettings();
+            appliedWorkplaceSettings = loadAppliedWorkplaceSettings();
+            renderWorkplaceSettings();
+            const appliedAt = localStorage.getItem('weldWorkplaceAppliedAt');
+            if (appliedAt) {
+                const status = document.getElementById('workplaceApplyStatus');
+                status.textContent = `마지막 반영: ${formatWorkplaceTime(appliedAt)}`;
+                status.classList.remove('hidden');
+            }
             calculateImportance();
             renderFileList();
         };

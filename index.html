@@ -6,26 +6,6 @@
     <title>WELD-AI | 로그인</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    fontFamily: {
-                        sans: ['Inter', 'sans-serif'],
-                    },
-                    colors: {
-                        industrial: {
-                            900: '#0f172a',
-                            800: '#1e293b',
-                            700: '#334155',
-                            accent: '#3b82f6', // Blue for admin
-                            worker: '#f59e0b', // Amber for worker
-                        }
-                    }
-                }
-            }
-        }
-    </script>
     <style>
         body {
             font-family: 'Inter', sans-serif;
@@ -62,7 +42,7 @@
         </div>
 
         <!-- Login Form -->
-        <form id="loginForm" class="space-y-6" onsubmit="event.preventDefault();">
+        <form class="space-y-6">
             <div>
                 <label for="userId" class="block text-sm font-medium text-slate-300 mb-2">아이디</label>
                 <input type="text" id="userId" placeholder="아이디를 입력하세요" 
@@ -95,63 +75,10 @@
         </form>
     </main>
 
-    <!-- Custom Modal Message Box (replaces alert) -->
-    <div id="customModal" class="fixed inset-0 z-50 hidden flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm opacity-0 transition-opacity duration-300">
-        <div class="bg-slate-800 rounded-xl shadow-2xl p-6 max-w-sm w-full border border-slate-700 transform scale-95 transition-transform duration-300" id="modalContent">
-            <div class="flex items-center space-x-4">
-                <div class="flex-shrink-0 w-12 h-12 rounded-full bg-green-500/20 flex items-center justify-center">
-                    <svg class="w-6 h-6 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-                    </svg>
-                </div>
-                <div>
-                    <h3 class="text-lg font-medium text-white" id="modalTitle">로그인 성공</h3>
-                    <p class="text-sm text-slate-400 mt-1" id="modalMessage">메시지 내용</p>
-                </div>
-            </div>
-            <div class="mt-6 text-right">
-                <button onclick="closeModal()" class="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white text-sm font-medium rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-slate-500">
-                    확인
-                </button>
-            </div>
-        </div>
-    </div>
-
     <script>
-        const modal = document.getElementById('customModal');
-        const modalContent = document.getElementById('modalContent');
-        const modalMessage = document.getElementById('modalMessage');
-        const loginForm = document.getElementById('loginForm');
-        const userIdInput = document.getElementById('userId');
-        const userPwInput = document.getElementById('userPw');
-
         function handleLogin(role) {
             const destination = role === '관리자' ? 'admin_ai.html' : 'worker_ai.html';
             window.location.href = destination;
-        }
-
-        function showModal(message) {
-            modalMessage.textContent = message;
-            
-            // 모달 표시 (애니메이션 효과 적용)
-            modal.classList.remove('hidden');
-            // 약간의 지연 후 opacity 및 scale 변경으로 부드러운 전환 효과
-            setTimeout(() => {
-                modal.classList.remove('opacity-0');
-                modalContent.classList.remove('scale-95');
-                modalContent.classList.add('scale-100');
-            }, 10);
-        }
-
-        function closeModal() {
-            // 모달 숨기기 애니메이션
-            modal.classList.add('opacity-0');
-            modalContent.classList.remove('scale-100');
-            modalContent.classList.add('scale-95');
-            
-            setTimeout(() => {
-                modal.classList.add('hidden');
-            }, 300); // Tailwind transition 시간과 일치
         }
     </script>
 </body>

@@ -68,7 +68,7 @@
 
     <!-- Header Navigation -->
     <header class="bg-slate-900/90 border-b border-slate-800 backdrop-blur-md sticky top-0 z-50">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 min-h-16 py-2 flex flex-wrap items-center justify-between gap-2">
             <div class="flex items-center space-x-3">
                 <div class="p-2 bg-gradient-to-tr from-amber-500 to-amber-600 rounded-lg text-slate-950 font-bold glow-amber">
                     <i class="fa-solid fa-fire-burner text-xl"></i>
@@ -81,7 +81,7 @@
                 </div>
             </div>
             
-            <div class="flex items-center gap-3">
+            <div class="flex flex-wrap items-center justify-end gap-2">
                 <div class="hidden md:flex items-center gap-2 text-xs text-slate-400 bg-slate-800/80 px-3 py-1.5 rounded-full border border-slate-700">
                     <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
                     <span>AI 엔진 정상 작동 중</span>
@@ -89,6 +89,14 @@
                 <div class="flex items-center gap-2 bg-slate-800/80 border border-slate-700 rounded-lg px-2.5 py-1.5">
                     <label for="inspectorName" class="text-[10px] font-semibold uppercase tracking-wide text-slate-400">작업자</label>
                     <input id="inspectorName" type="text" maxlength="20" placeholder="이름 입력" class="w-28 bg-slate-900/80 border border-slate-700 rounded-md px-2 py-1 text-xs text-white placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-amber-500" />
+                </div>
+                <div class="flex items-center gap-2 bg-slate-800/80 border border-slate-700 rounded-lg px-2.5 py-1.5">
+                    <label for="workplaceInput" class="text-[10px] font-semibold tracking-wide text-slate-400">작업장소</label>
+                    <input id="workplaceInput" type="text" maxlength="40" placeholder="예: A동 1라인" class="w-28 bg-slate-900/80 border border-slate-700 rounded-md px-2 py-1 text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-amber-500" />
+                </div>
+                <div class="flex items-center gap-2 bg-slate-800/80 border border-slate-700 rounded-lg px-2.5 py-1.5">
+                    <label for="deliveryDateInput" class="text-[10px] font-semibold tracking-wide text-slate-400">납기</label>
+                    <input id="deliveryDateInput" type="date" class="w-32 bg-slate-900/80 border border-slate-700 rounded-md px-2 py-1 text-xs text-white focus:outline-none focus:ring-1 focus:ring-amber-500" />
                 </div>
                 <button id="reportBtn" onclick="generateInspectionPdfReport()" disabled class="px-3 py-1.5 text-xs font-semibold rounded-lg bg-slate-800 text-slate-400 border border-slate-700 flex items-center gap-1.5 transition opacity-50 cursor-not-allowed">
                     <i class="fa-solid fa-print"></i>
@@ -378,7 +386,6 @@
         let currentSampleKey = 'good';
         let radarChartInstance = null;
         let loadedImage = null;
-        let isCustomImage = false;
         let webcamStream = null;
         let lastDetectedWeldBox = null;
         let analysisCompleted = false;
@@ -608,6 +615,16 @@
             return input.value.trim();
         }
 
+        function getWorkplace() {
+            const input = document.getElementById('workplaceInput');
+            return input ? input.value.trim() : '';
+        }
+
+        function getDeliveryDate() {
+            const input = document.getElementById('deliveryDateInput');
+            return input ? input.value : '';
+        }
+
         function renderHistoryTable() {
             const tbody = document.getElementById('historyTableBody');
             if (!tbody) return;
@@ -628,26 +645,57 @@
             if (summary) summary.innerText = `최근 이력 ${inspectionHistory.length}건`;
         }
 
+        function createReportThumbnail() {
+            const source = document.getElementById('inspectionCanvas');
+            if (!source || !source.width || !source.height) return '';
+            const thumbnail = document.createElement('canvas');
+            thumbnail.width = 240;
+            thumbnail.height = 136;
+            try {
+                const context = thumbnail.getContext('2d');
+                context.drawImage(source, 0, 0, thumbnail.width, thumbnail.height);
+                return thumbnail.toDataURL('image/jpeg', 0.55);
+            } catch (error) {
+                console.warn('Report thumbnail could not be saved:', error);
+                return '';
+            }
+        }
+
         function saveInspectionHistory() {
             const data = applyMetricsToPreset(currentSampleKey, currentMetrics);
             const workerName = getInspectorName() || '미기재';
             const entry = {
                 date: new Date().toLocaleString('ko-KR'),
+                createdAt: new Date().toISOString(),
                 process: currentProcess,
                 score: data.score,
                 result: data.badgeText,
-                inspector: workerName
+                inspector: workerName,
+                workplace: getWorkplace(),
+                deliveryDate: getDeliveryDate(),
+                reportThumbnail: createReportThumbnail(),
+                defectTypes: (data.defects || []).map(defect => defect.name),
+                reportMetrics: {
+                    beadWidth: data.beadWidth,
+                    roughness: data.roughness,
+                    defectRate: data.defectRate,
+                    defects: (data.defects || []).map(defect => `${defect.name}: ${defect.loc} (${defect.risk})`).join(' · ')
+                }
             };
 
-            inspectionHistory = [entry, ...inspectionHistory].slice(0, 8);
-            localStorage.setItem('weldInspectionHistory', JSON.stringify(inspectionHistory));
+            inspectionHistory = [entry, ...inspectionHistory].slice(0, 50);
+            try {
+                localStorage.setItem('weldInspectionHistory', JSON.stringify(inspectionHistory));
+            } catch (error) {
+                const withoutThumbnails = inspectionHistory.map(({ reportThumbnail, ...item }) => item);
+                try {
+                    localStorage.setItem('weldInspectionHistory', JSON.stringify(withoutThumbnails));
+                    inspectionHistory = withoutThumbnails;
+                } catch (storageError) {
+                    console.error('Inspection history could not be saved:', storageError);
+                }
+            }
             renderHistoryTable();
-        }
-
-        function outputReportToHistory() {
-            saveInspectionHistory();
-            const summary = document.getElementById('historySummary');
-            if (summary) summary.innerText = '최근 이력 저장 완료';
         }
 
         async function generateInspectionPdfReport() {
@@ -781,6 +829,7 @@
                 ctx.font = '14px sans-serif';
                 ctx.fillText(`검사 일시: ${new Date().toLocaleString('ko-KR')}`, 900, 58);
                 ctx.fillText(`공법: ${currentProcess} / 작업자: ${workerName}`, 900, 82);
+                ctx.fillText(`작업장소: ${getWorkplace() || '미입력'} / 납기: ${getDeliveryDate() || '미입력'}`, 70, 104);
 
                 const passLabel = passBadge ? passBadge.innerText : '판정 미확인';
                 const scoreLabel = scoreText ? scoreText.innerText : '0%';
@@ -1216,7 +1265,6 @@
         }
 
         function loadSampleImage(key) {
-            isCustomImage = false;
             currentSampleKey = key;
             document.getElementById('dropzone').classList.add('hidden');
             document.getElementById('reuploadBtn').classList.add('hidden');
@@ -1309,7 +1357,6 @@
             reader.onload = function(e) {
                 const img = new Image();
                 img.onload = function() {
-                    isCustomImage = true;
                     const canvas = document.getElementById('inspectionCanvas');
                     canvas.width = 600;
                     canvas.height = 340;
@@ -1372,7 +1419,6 @@
 
             const img = new Image();
             img.onload = function() {
-                isCustomImage = true;
                 loadedImage = img;
                 const inspectCanvas = document.getElementById('inspectionCanvas');
                 inspectCanvas.width = 600;
