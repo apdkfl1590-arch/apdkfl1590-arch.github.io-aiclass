@@ -140,6 +140,7 @@
                         <span class="text-[11px] text-slate-400 mt-1">잠호 아크 용접 / Submerged Arc Welding</span>
                     </button>
                 </div>
+                <div id="processRecommendationNotice" role="status" class="hidden mt-4 rounded-lg border px-4 py-3 text-sm leading-6"></div>
             </div>
 
             <!-- 2. Image Upload & Canvas Box -->
@@ -228,6 +229,10 @@
 
         <!-- Right Panel: Inspection Results & Analytics (7 Cols) -->
         <section id="resultPanel" class="lg:col-span-7 flex flex-col gap-6 hidden">
+
+            <p class="rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm leading-6 text-amber-100">
+                사진 분석은 밝기와 형상에 따른 시제품 추정입니다. 실제 합격·불량 판정과 결함 위치는 품질 담당자가 확인해 주세요.
+            </p>
 
             <!-- Quality Score Header Card -->
             <div class="bg-slate-900/80 rounded-xl p-5 border border-slate-800 shadow-xl flex flex-col sm:flex-row items-center justify-between gap-6">
@@ -329,26 +334,48 @@
                 </div>
             </div>
 
+        </section>
+
+        <section class="lg:col-span-12 flex flex-col gap-4" aria-label="작업 이력 및 관리자 답변">
             <div id="historyDashboardCard" class="bg-slate-900/80 rounded-xl p-5 border border-slate-800 shadow-xl">
-                <h3 class="text-xs font-bold text-slate-300 uppercase tracking-wider mb-3 flex items-center gap-2">
-                    <i class="fa-solid fa-database text-violet-400"></i> 작업 이력 및 관리자 대시보드
-                </h3>
-                <div class="overflow-hidden rounded-lg border border-slate-700">
-                    <table class="w-full text-left text-[11px] text-slate-300">
+                <div class="mb-3 flex flex-wrap items-center justify-between gap-3">
+                    <h3 class="text-base font-bold text-slate-200 flex items-center gap-2">
+                        <i class="fa-solid fa-database text-violet-400"></i> 작업 이력 및 관리자 대시보드
+                    </h3>
+                    <div class="flex flex-wrap items-center gap-2">
+                        <button id="managerFeedbackBell" type="button" onclick="requestReportFeedback('')" title="새 관리자 답변 확인" aria-label="새 관리자 답변 확인" class="hidden rounded-lg bg-amber-400 px-3 py-2 text-sm font-bold text-slate-950 hover:bg-amber-300">
+                            <i class="fa-solid fa-bell mr-1" aria-hidden="true"></i>새 답변
+                        </button>
+                        <button type="button" onclick="openWorkerPinSetup()" class="rounded-lg border border-slate-600 px-3 py-2 text-xs font-semibold text-slate-200 hover:bg-slate-800">
+                            답변 비밀번호 설정
+                        </button>
+                    </div>
+                </div>
+                <div class="overflow-x-auto rounded-lg border border-slate-700">
+                    <table class="w-full min-w-[680px] text-left text-xs text-slate-300">
                         <thead class="bg-slate-800 text-slate-200">
                             <tr>
-                                <th class="px-2 py-2">일시</th>
-                                <th class="px-2 py-2">공법</th>
-                                <th class="px-2 py-2">점수</th>
-                                <th class="px-2 py-2">작업자</th>
+                                <th class="px-3 py-3">일시</th>
+                                <th class="px-3 py-3">공법</th>
+                                <th class="px-3 py-3">점수</th>
+                                <th class="px-3 py-3">작업자</th>
+                                <th class="px-3 py-3">관리자 전송</th>
+                                <th class="px-3 py-3">관리자 답변</th>
                             </tr>
                         </thead>
                         <tbody id="historyTableBody" class="bg-slate-950/50"></tbody>
                     </table>
                 </div>
-                <div class="mt-3 text-[11px] text-slate-400" id="historySummary">최근 이력 0건</div>
+                <div class="mt-3 text-xs text-slate-400" id="historySummary">최근 이력 0건</div>
             </div>
 
+            <div id="managerFeedbackCard" class="hidden bg-slate-900/80 rounded-xl p-5 border border-cyan-800 shadow-xl">
+                <h3 class="text-base font-bold text-white flex items-center gap-2">
+                    <i class="fa-solid fa-comment-dots text-cyan-300"></i> 관리자 피드백
+                </h3>
+                <p id="managerFeedbackNotice" role="status" class="hidden mt-3 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm font-semibold text-amber-200"></p>
+                <div id="managerFeedbackList" class="mt-3 space-y-3"></div>
+            </div>
         </section>
     </main>
 
@@ -373,6 +400,35 @@
         </div>
     </div>
 
+    <div id="workerPinSetupModal" class="hidden fixed inset-0 z-[80] flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-sm">
+        <section class="w-full max-w-sm rounded-xl border border-slate-700 bg-slate-900 p-6 shadow-2xl" role="dialog" aria-modal="true" aria-labelledby="workerPinSetupTitle">
+            <h3 id="workerPinSetupTitle" class="text-base font-bold text-white">답변 비밀번호 설정</h3>
+            <p class="mt-2 text-sm leading-6 text-slate-300">관리자 답변을 볼 때 사용할 네 자리 숫자를 정해 주세요.</p>
+            <label class="mt-4 block text-sm text-slate-300">새 비밀번호
+                <input id="workerPinNew" type="password" inputmode="numeric" autocomplete="new-password" maxlength="4" pattern="[0-9]{4}" class="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-3 text-lg tracking-[0.3em] text-white focus:outline-none focus:ring-2 focus:ring-cyan-500">
+            </label>
+            <label class="mt-3 block text-sm text-slate-300">한 번 더 입력
+                <input id="workerPinConfirm" type="password" inputmode="numeric" autocomplete="new-password" maxlength="4" pattern="[0-9]{4}" class="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-3 text-lg tracking-[0.3em] text-white focus:outline-none focus:ring-2 focus:ring-cyan-500">
+            </label>
+            <div class="mt-5 flex justify-end gap-2">
+                <button type="button" onclick="closeWorkerPinSetup()" class="rounded-lg bg-slate-800 px-4 py-2 text-sm font-semibold text-slate-300">취소</button>
+                <button type="button" onclick="saveWorkerAnswerPin()" class="rounded-lg bg-cyan-600 px-4 py-2 text-sm font-bold text-white">비밀번호 저장</button>
+            </div>
+        </section>
+    </div>
+
+    <div id="workerPinPromptModal" class="hidden fixed inset-0 z-[80] flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-sm">
+        <section class="w-full max-w-sm rounded-xl border border-slate-700 bg-slate-900 p-6 shadow-2xl" role="dialog" aria-modal="true" aria-labelledby="workerPinPromptTitle">
+            <h3 id="workerPinPromptTitle" class="text-base font-bold text-white">관리자 답변 확인</h3>
+            <p class="mt-2 text-sm leading-6 text-slate-300">비밀번호를 입력해 주시기 바랍니다.</p>
+            <input id="workerPinEntry" type="password" inputmode="numeric" autocomplete="current-password" maxlength="4" pattern="[0-9]{4}" aria-label="네 자리 비밀번호" class="mt-4 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-3 text-lg tracking-[0.3em] text-white focus:outline-none focus:ring-2 focus:ring-cyan-500">
+            <div class="mt-5 flex justify-end gap-2">
+                <button type="button" onclick="closeWorkerPinPrompt()" class="rounded-lg bg-slate-800 px-4 py-2 text-sm font-semibold text-slate-300">취소</button>
+                <button type="button" onclick="verifyWorkerAnswerPin()" class="rounded-lg bg-cyan-600 px-4 py-2 text-sm font-bold text-white">확인</button>
+            </div>
+        </section>
+    </div>
+
     <script>
         const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
         const average = (values) => values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : 0;
@@ -383,13 +439,20 @@
 
         // App State
         let currentProcess = 'SMAW';
+        let recommendedWeldingProcess = '';
         let currentSampleKey = 'good';
         let radarChartInstance = null;
         let loadedImage = null;
         let webcamStream = null;
         let lastDetectedWeldBox = null;
         let analysisCompleted = false;
+        let isSampleImage = false;
         let inspectionHistory = JSON.parse(localStorage.getItem('weldInspectionHistory') || '[]');
+        let managerFeedbackSeenIds = new Set();
+        let managerFeedbackUnreadIds = new Set();
+        let focusedFeedbackReportId = '';
+        let unlockedFeedbackReportIds = new Set();
+        let pendingFeedbackReportId = '';
         let currentMetrics = {
             score: 92,
             beadWidth: 92.4,
@@ -535,6 +598,22 @@
             initRadarChart();
             selectWeldingType('SMAW');
             loadSampleImage('good');
+            renderHistoryTable();
+            updateManagerFeedbackState();
+
+            document.getElementById('inspectorName').addEventListener('input', handleManagerFeedbackUpdate);
+            window.addEventListener('storage', event => {
+                if (event.key === 'weldWorkerFeedback') handleManagerFeedbackUpdate();
+                if (event.key === 'weldInspectionHistory') {
+                    try {
+                        const history = JSON.parse(event.newValue || '[]');
+                        inspectionHistory = Array.isArray(history) ? history : [];
+                    } catch {
+                        inspectionHistory = [];
+                    }
+                    renderHistoryTable();
+                }
+            });
 
             const dropzone = document.getElementById('dropzone');
             dropzone.addEventListener('dragover', (e) => { e.preventDefault(); dropzone.classList.add('bg-slate-800/60'); });
@@ -632,17 +711,236 @@
 
             inspectionHistory.forEach(item => {
                 const tr = document.createElement('tr');
-                tr.innerHTML = `
-                    <td class="px-2 py-2 border-b border-slate-800">${item.date}</td>
-                    <td class="px-2 py-2 border-b border-slate-800">${item.process}</td>
-                    <td class="px-2 py-2 border-b border-slate-800">${item.score}</td>
-                    <td class="px-2 py-2 border-b border-slate-800">${item.inspector || item.result || '미기재'}</td>
-                `;
+                const cells = [item.date, item.process, `${item.score}점`, item.inspector || '미기재'];
+                cells.forEach(value => {
+                    const cell = document.createElement('td');
+                    cell.className = 'px-2 py-2 border-b border-slate-800';
+                    cell.textContent = value || '미기재';
+                    tr.appendChild(cell);
+                });
+
+                const reportCell = document.createElement('td');
+                reportCell.className = 'px-2 py-2 border-b border-slate-800';
+                const reportStatus = document.createElement('span');
+                reportStatus.className = 'inline-flex items-center gap-1 text-emerald-300';
+                const sentIcon = document.createElement('i');
+                sentIcon.className = 'fa-solid fa-paper-plane';
+                sentIcon.setAttribute('aria-hidden', 'true');
+                const sentAt = item.reportSentAt ? new Date(item.reportSentAt).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }) : '';
+                reportStatus.append(sentIcon, document.createTextNode(` ${sentAt} 전송 완료`));
+                reportCell.appendChild(reportStatus);
+                tr.appendChild(reportCell);
+
+                const replyCell = document.createElement('td');
+                replyCell.className = 'px-2 py-2 border-b border-slate-800';
+                const replies = getWorkerFeedbackRecords().filter(feedback => feedback.reportId === item.id && feedback.worker === item.inspector);
+                if (replies.length) {
+                    const replyButton = document.createElement('button');
+                    const unreadReplies = replies.filter(feedback => managerFeedbackUnreadIds.has(feedback.id));
+                    replyButton.type = 'button';
+                    replyButton.className = unreadReplies.length ? 'inline-flex items-center gap-1 font-bold text-amber-300 hover:text-amber-200' : 'inline-flex items-center gap-1 text-cyan-300 hover:text-cyan-200';
+                    replyButton.innerHTML = unreadReplies.length
+                        ? `<i class="fa-solid fa-bell" aria-hidden="true"></i> 답변 도착 ${unreadReplies.length}건`
+                        : `<i class="fa-solid fa-comment-dots" aria-hidden="true"></i> 답변 ${replies.length}건 보기`;
+                    replyButton.addEventListener('click', () => requestReportFeedback(item.id));
+                    replyCell.appendChild(replyButton);
+                } else {
+                    replyCell.textContent = '답변 대기 중';
+                    replyCell.classList.add('text-slate-500');
+                }
+                tr.appendChild(replyCell);
                 tbody.appendChild(tr);
             });
 
             const summary = document.getElementById('historySummary');
             if (summary) summary.innerText = `최근 이력 ${inspectionHistory.length}건`;
+        }
+
+        function getWorkerFeedbackRecords() {
+            try {
+                const feedback = JSON.parse(localStorage.getItem('weldWorkerFeedback') || '[]');
+                return Array.isArray(feedback) ? feedback : [];
+            } catch {
+                return [];
+            }
+        }
+
+        function getWorkerFeedbackReadIds(workerName) {
+            if (!workerName) return new Set();
+            try {
+                const ids = JSON.parse(localStorage.getItem(`weldWorkerFeedbackRead:${workerName}`) || '[]');
+                return new Set(Array.isArray(ids) ? ids : []);
+            } catch {
+                return new Set();
+            }
+        }
+
+        function updateManagerFeedbackState() {
+            const workerName = getInspectorName();
+            const feedback = getWorkerFeedbackRecords().filter(item => workerName && item.worker === workerName);
+            managerFeedbackSeenIds = getWorkerFeedbackReadIds(workerName);
+            managerFeedbackUnreadIds = new Set(feedback.filter(item => !managerFeedbackSeenIds.has(item.id)).map(item => item.id));
+            renderManagerFeedback();
+            renderHistoryTable();
+
+            const bell = document.getElementById('managerFeedbackBell');
+            bell.classList.toggle('hidden', managerFeedbackUnreadIds.size === 0);
+            const notice = document.getElementById('managerFeedbackNotice');
+            if (managerFeedbackUnreadIds.size) {
+                notice.textContent = `관리자 답변 ${managerFeedbackUnreadIds.size}건이 도착했습니다. 종 모양 버튼을 눌러 확인하세요.`;
+                notice.classList.remove('hidden');
+            } else {
+                notice.classList.add('hidden');
+            }
+        }
+
+        async function hashWorkerAnswerPin(pin) {
+            const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(pin));
+            return [...new Uint8Array(digest)].map(byte => byte.toString(16).padStart(2, '0')).join('');
+        }
+
+        function openWorkerPinSetup() {
+            if (!getInspectorName()) {
+                alert('비밀번호를 설정하려면 먼저 작업자 이름을 입력해 주세요.');
+                document.getElementById('inspectorName').focus();
+                return;
+            }
+            document.getElementById('workerPinNew').value = '';
+            document.getElementById('workerPinConfirm').value = '';
+            document.getElementById('workerPinSetupModal').classList.remove('hidden');
+            document.getElementById('workerPinNew').focus();
+        }
+
+        function closeWorkerPinSetup() {
+            document.getElementById('workerPinSetupModal').classList.add('hidden');
+        }
+
+        async function saveWorkerAnswerPin() {
+            const workerName = getInspectorName();
+            const pin = document.getElementById('workerPinNew').value;
+            const confirmation = document.getElementById('workerPinConfirm').value;
+            if (!/^\d{4}$/.test(pin)) {
+                alert('비밀번호는 네 자리 숫자로 입력해 주세요.');
+                document.getElementById('workerPinNew').focus();
+                return;
+            }
+            if (pin !== confirmation) {
+                alert('두 비밀번호가 서로 다릅니다. 다시 입력해 주세요.');
+                document.getElementById('workerPinConfirm').focus();
+                return;
+            }
+
+            try {
+                localStorage.setItem(`weldWorkerPinHash:${workerName}`, await hashWorkerAnswerPin(pin));
+            } catch {
+                alert('비밀번호를 저장할 수 없습니다. 브라우저 보안 설정을 확인해 주세요.');
+                return;
+            }
+            closeWorkerPinSetup();
+            alert('네 자리 답변 비밀번호를 저장했습니다.');
+        }
+
+        function requestReportFeedback(reportId) {
+            const workerName = getInspectorName();
+            if (!workerName) {
+                alert('작업자 이름을 입력하면 해당 작업자의 관리자 답변을 확인할 수 있습니다.');
+                document.getElementById('inspectorName').focus();
+                return;
+            }
+            if (!localStorage.getItem(`weldWorkerPinHash:${workerName}`)) {
+                alert('답변을 보기 전에 네 자리 비밀번호를 설정해 주세요.');
+                openWorkerPinSetup();
+                return;
+            }
+
+            pendingFeedbackReportId = reportId || '';
+            document.getElementById('workerPinEntry').value = '';
+            document.getElementById('workerPinPromptModal').classList.remove('hidden');
+            document.getElementById('workerPinEntry').focus();
+        }
+
+        function closeWorkerPinPrompt() {
+            pendingFeedbackReportId = '';
+            document.getElementById('workerPinPromptModal').classList.add('hidden');
+        }
+
+        async function verifyWorkerAnswerPin() {
+            const workerName = getInspectorName();
+            const pin = document.getElementById('workerPinEntry').value;
+            if (!/^\d{4}$/.test(pin)) {
+                alert('비밀번호는 네 자리 숫자로 입력해 주세요.');
+                document.getElementById('workerPinEntry').focus();
+                return;
+            }
+
+            let enteredHash = '';
+            try {
+                enteredHash = await hashWorkerAnswerPin(pin);
+            } catch {
+                alert('비밀번호를 확인할 수 없습니다. 브라우저 보안 설정을 확인해 주세요.');
+                closeWorkerPinPrompt();
+                return;
+            }
+            if (enteredHash !== localStorage.getItem(`weldWorkerPinHash:${workerName}`)) {
+                closeWorkerPinPrompt();
+                unlockedFeedbackReportIds.clear();
+                focusedFeedbackReportId = '';
+                renderManagerFeedback();
+                alert('틀린비밀번호입니다.');
+                return;
+            }
+
+            const reportId = pendingFeedbackReportId;
+            closeWorkerPinPrompt();
+            revealReportFeedback(reportId);
+        }
+
+        function revealReportFeedback(reportId) {
+            const workerName = getInspectorName();
+            focusedFeedbackReportId = reportId || '';
+            const visibleFeedback = getWorkerFeedbackRecords().filter(item =>
+                item.worker === workerName && (!reportId || item.reportId === reportId)
+            );
+            const readIds = getWorkerFeedbackReadIds(workerName);
+            visibleFeedback.forEach(item => {
+                readIds.add(item.id);
+                unlockedFeedbackReportIds.add(item.reportId);
+            });
+            localStorage.setItem(`weldWorkerFeedbackRead:${workerName}`, JSON.stringify([...readIds]));
+            updateManagerFeedbackState();
+            document.getElementById('managerFeedbackCard').scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+
+        function renderManagerFeedback() {
+            const card = document.getElementById('managerFeedbackCard');
+            const list = document.getElementById('managerFeedbackList');
+            const workerName = getInspectorName();
+            const feedback = getWorkerFeedbackRecords()
+                .filter(item => workerName && item.worker === workerName && unlockedFeedbackReportIds.has(item.reportId) && (!focusedFeedbackReportId || item.reportId === focusedFeedbackReportId))
+                .sort((first, second) => new Date(second.sentAt) - new Date(first.sentAt));
+
+            list.replaceChildren();
+            card.classList.toggle('hidden', feedback.length === 0);
+            feedback.forEach(item => {
+                const entry = document.createElement('article');
+                entry.className = 'rounded-lg border border-slate-700 bg-slate-950/70 p-4';
+                const metadata = document.createElement('p');
+                metadata.className = 'text-xs font-semibold text-cyan-200';
+                metadata.textContent = `${new Date(item.sentAt).toLocaleString('ko-KR')} · ${item.workType || '공법 미기재'} · ${item.workplace || '장소 미기재'}`;
+                const reportInfo = document.createElement('p');
+                reportInfo.className = 'mt-1 text-[11px] text-slate-400';
+                reportInfo.textContent = item.reportDate ? `관련 보고서: ${item.reportDate}` : '관련 보고서 피드백';
+                const message = document.createElement('p');
+                message.className = 'mt-3 whitespace-pre-wrap text-sm leading-6 text-slate-100';
+                message.textContent = item.message;
+                entry.append(metadata, reportInfo, message);
+                list.appendChild(entry);
+            });
+        }
+
+        function handleManagerFeedbackUpdate() {
+            focusedFeedbackReportId = '';
+            updateManagerFeedbackState();
         }
 
         function createReportThumbnail() {
@@ -664,9 +962,12 @@
         function saveInspectionHistory() {
             const data = applyMetricsToPreset(currentSampleKey, currentMetrics);
             const workerName = getInspectorName() || '미기재';
+            const reportId = `report-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
             const entry = {
+                id: reportId,
                 date: new Date().toLocaleString('ko-KR'),
                 createdAt: new Date().toISOString(),
+                reportSentAt: new Date().toISOString(),
                 process: currentProcess,
                 score: data.score,
                 result: data.badgeText,
@@ -933,13 +1234,26 @@
                 ctx.font = 'bold 18px sans-serif';
                 ctx.fillText('품질 요인 다차원 평가', 646, 468);
 
-                const radarImage = new Image();
-                radarImage.src = radarCanvas.toDataURL('image/png');
-                await new Promise((resolve, reject) => {
-                    radarImage.onload = resolve;
-                    radarImage.onerror = reject;
-                });
-                ctx.drawImage(radarImage, 678, 500, 430, 200);
+                refreshRadarChart();
+                let radarImageData = '';
+                try {
+                    if (radarCanvas.width && radarCanvas.height) radarImageData = radarCanvas.toDataURL('image/png');
+                } catch (error) {
+                    console.warn('Radar chart image could not be captured:', error);
+                }
+                if (radarImageData && radarImageData !== 'data:,') {
+                    const radarImage = new Image();
+                    await new Promise((resolve, reject) => {
+                        radarImage.onload = resolve;
+                        radarImage.onerror = reject;
+                        radarImage.src = radarImageData;
+                    });
+                    ctx.drawImage(radarImage, 678, 500, 430, 200);
+                } else {
+                    ctx.fillStyle = '#94a3b8';
+                    ctx.font = '14px sans-serif';
+                    ctx.fillText('품질 그래프를 표시할 수 없습니다.', 710, 605);
+                }
 
                 // Bottom status strip
                 roundedRect(36, 760, 1128, 122, 18);
@@ -978,10 +1292,10 @@
                     ? (loadedImage.src || loadedImage.currentSrc)
                     : inspectionCanvas.toDataURL('image/png');
 
-                uploadedImage.src = uploadSrc;
                 await new Promise((resolve, reject) => {
                     uploadedImage.onload = resolve;
                     uploadedImage.onerror = reject;
+                    uploadedImage.src = uploadSrc;
                 });
 
                 const imgBoxX = 90;
@@ -1030,6 +1344,9 @@
             if (!panel) return;
             analysisCompleted = visible;
             panel.classList.toggle('hidden', !visible);
+            if (visible && radarChartInstance) {
+                requestAnimationFrame(refreshRadarChart);
+            }
             if (reportBtn) {
                 reportBtn.disabled = !visible;
                 reportBtn.classList.toggle('opacity-50', !visible);
@@ -1046,16 +1363,42 @@
             }
         }
 
-        function recommendWeldingProcessForImage(info) {
-            if (info.undercutRisk > 0.22) return 'SMAW';
-            if (info.spatterRatio > 0.16 || info.roughness > 5.2) return 'GMAW';
-            if (info.beadWidth > 90 && info.roughness < 4.4) return 'SAW';
-            if (info.porosityRatio > 0.10 || info.defectRate > 18) return 'GTAW';
-            if (info.beadWidth < 75) return 'GTAW';
+        function recommendWeldingProcessForImage(metrics) {
+            if (metrics.undercutRisk >= 0.2) return 'FCAW';
+            if (metrics.porosityRatio >= 0.1) return 'GTAW';
+            if (metrics.spatterRatio >= 0.12 || metrics.roughness >= 5.2) return 'GMAW';
+            if (metrics.beadWidth >= 90 && metrics.roughness < 4.4) return 'GTAW';
+            if (metrics.beadWidth < 75) return 'SMAW';
             return 'SMAW';
         }
 
-        function selectWeldingType(type) {
+        function updateMethodRecommendation(metrics, autoSelect = false) {
+            recommendedWeldingProcess = recommendWeldingProcessForImage(metrics);
+            if (autoSelect) selectWeldingType(recommendedWeldingProcess, false);
+            updateWeldingMethodNotice();
+        }
+
+        function updateWeldingMethodNotice() {
+            const notice = document.getElementById('processRecommendationNotice');
+            if (!notice || !recommendedWeldingProcess) return;
+
+            const methodNames = {
+                SMAW: 'SMAW (피복 아크 용접)',
+                GMAW: 'GMAW (MIG/MAG)',
+                GTAW: 'GTAW (TIG)',
+                FCAW: 'FCAW (플럭스 코어드)',
+                SAW: 'SAW (서브머지드)'
+            };
+            const mismatch = currentProcess !== recommendedWeldingProcess;
+            notice.className = mismatch
+                ? 'mt-4 rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm leading-6 text-amber-100'
+                : 'mt-4 rounded-lg border border-cyan-500/30 bg-cyan-500/10 px-4 py-3 text-sm leading-6 text-cyan-100';
+            notice.textContent = mismatch
+                ? `알맞지 않은 용접법을 선택했을 수 있습니다. 알맞은 용접법은 ${methodNames[recommendedWeldingProcess]}로 판단됩니다. 사진 외관 분석에 따른 참고 추천입니다.`
+                : `사진 기준 추천 용접법은 ${methodNames[recommendedWeldingProcess]}입니다. 참고용 추정 결과이므로 실제 작업 방법을 확인해 주세요.`;
+        }
+
+        function selectWeldingType(type, manualSelection = true) {
             currentProcess = type;
             const buttons = document.querySelectorAll('.welding-type-btn');
             buttons.forEach(btn => {
@@ -1068,6 +1411,7 @@
                 }
             });
             document.getElementById('currentProcessBadge').innerText = `선택: ${type}`;
+            if (manualSelection) updateWeldingMethodNotice();
             if (document.getElementById('resultPanel') && !document.getElementById('resultPanel').classList.contains('hidden')) {
                 updateDashboardText();
             }
@@ -1276,7 +1620,25 @@
             return result;
         }
 
+        function getSampleAnalysisMetrics(key) {
+            const preset = samplePresets[key] || samplePresets.good;
+            const sampleRatios = {
+                good: { porosityRatio: 0.02, spatterRatio: 0.04, undercutRisk: 0.08 },
+                porosity: { porosityRatio: 0.12, spatterRatio: 0.04, undercutRisk: 0.08 },
+                spatter: { porosityRatio: 0.02, spatterRatio: 0.14, undercutRisk: 0.08 },
+                undercut: { porosityRatio: 0.02, spatterRatio: 0.04, undercutRisk: 0.24 }
+            };
+            return {
+                score: preset.score,
+                beadWidth: parseFloat(preset.beadWidth),
+                roughness: parseFloat(preset.roughness.replace(/[^\d.]/g, '')),
+                defectRate: parseFloat(preset.defectRate),
+                ...(sampleRatios[key] || sampleRatios.good)
+            };
+        }
+
         function loadSampleImage(key) {
+            isSampleImage = true;
             currentSampleKey = key;
             document.getElementById('dropzone').classList.add('hidden');
             document.getElementById('reuploadBtn').classList.add('hidden');
@@ -1343,16 +1705,9 @@
             img.src = canvas.toDataURL();
             img.onload = () => {
                 loadedImage = img;
-                currentMetrics = {
-                    score: samplePresets[key].score,
-                    beadWidth: parseFloat(samplePresets[key].beadWidth),
-                    roughness: parseFloat(samplePresets[key].roughness.replace(/[^\d.]/g, '')),
-                    defectRate: parseFloat(samplePresets[key].defectRate),
-                    porosityRatio: key === 'porosity' ? 0.22 : 0.02,
-                    spatterRatio: key === 'spatter' ? 0.16 : 0.04,
-                    undercutRisk: key === 'undercut' ? 0.32 : 0.08
-                };
-                lastDetectedWeldBox = estimateDefectRegion(ctx, canvas.width, canvas.height, currentMetrics) || (samplePresets[key].boxes && samplePresets[key].boxes[0]);
+                currentMetrics = getSampleAnalysisMetrics(key);
+                updateMethodRecommendation(currentMetrics, true);
+                lastDetectedWeldBox = samplePresets[key].boxes?.[0] || null;
                 setResultsVisible(false);
                 drawOverlay();
                 updateDashboardText();
@@ -1365,6 +1720,7 @@
         }
 
         function processUploadedFile(file) {
+            isSampleImage = false;
             const reader = new FileReader();
             reader.onload = function(e) {
                 const img = new Image();
@@ -1384,8 +1740,7 @@
                     const analysisMetrics = computeImageMetrics(ctx, canvas.width, canvas.height);
                     currentMetrics = analysisMetrics;
                     currentSampleKey = classifyImage(analysisMetrics);
-                    const recommendedProcess = recommendWeldingProcessForImage(analysisMetrics);
-                    selectWeldingType(recommendedProcess);
+                    updateMethodRecommendation(analysisMetrics, true);
                     lastDetectedWeldBox = estimateDefectRegion(ctx, canvas.width, canvas.height, analysisMetrics);
                     drawOverlay();
                     setResultsVisible(false);
@@ -1397,9 +1752,11 @@
         }
 
         function analyzeCustomUploadedImage(ctx, w, h) {
+            isSampleImage = false;
             const analysisMetrics = computeImageMetrics(ctx, w, h);
             currentMetrics = analysisMetrics;
             currentSampleKey = classifyImage(analysisMetrics);
+            updateMethodRecommendation(analysisMetrics, true);
         }
 
         async function openWebcamModal() {
@@ -1422,6 +1779,7 @@
         }
 
         function captureWebcam() {
+            isSampleImage = false;
             const video = document.getElementById('webcamVideo');
             const canvas = document.createElement('canvas');
             canvas.width = 600;
@@ -1443,8 +1801,6 @@
 
                 analyzeCustomUploadedImage(inspectCanvas.getContext('2d'), 600, 340);
                 analysisCompleted = false;
-                const recommendedProcess = recommendWeldingProcessForImage(currentMetrics);
-                selectWeldingType(recommendedProcess);
                 lastDetectedWeldBox = estimateDefectRegion(inspectCanvas.getContext('2d'), 600, 340, currentMetrics);
                 drawOverlay();
                 setResultsVisible(false);
@@ -1505,11 +1861,18 @@
                 btn.disabled = false;
                 btn.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles"></i> <span>AI 용접 품질 측정 및 진단 시작</span>';
                 if (loadedImage) {
-                    const canvas = document.getElementById('inspectionCanvas');
-                    const ctx = canvas.getContext('2d');
-                    const analysisMetrics = computeImageMetrics(ctx, canvas.width, canvas.height);
-                    currentMetrics = analysisMetrics;
-                    currentSampleKey = classifyImage(analysisMetrics);
+                    if (isSampleImage) {
+                        currentMetrics = getSampleAnalysisMetrics(currentSampleKey);
+                        lastDetectedWeldBox = samplePresets[currentSampleKey].boxes?.[0] || null;
+                    } else {
+                        const canvas = document.getElementById('inspectionCanvas');
+                        const ctx = canvas.getContext('2d');
+                        const analysisMetrics = computeImageMetrics(ctx, canvas.width, canvas.height);
+                        currentMetrics = analysisMetrics;
+                        currentSampleKey = classifyImage(analysisMetrics);
+                        lastDetectedWeldBox = estimateDefectRegion(ctx, canvas.width, canvas.height, analysisMetrics);
+                    }
+                    updateMethodRecommendation(currentMetrics, false);
                     document.getElementById('currentProcessBadge').innerText = `선택: ${currentProcess}`;
                 }
                 analysisCompleted = true;
@@ -1613,6 +1976,24 @@
                     }
                 }
             });
+        }
+
+        function refreshRadarChart() {
+            const canvas = document.getElementById('qualityRadarChart');
+            if (!canvas) return;
+            const chartData = radarChartInstance?.data.datasets[0].data.slice();
+            if (!radarChartInstance || !canvas.width || !canvas.height) {
+                radarChartInstance?.destroy();
+                radarChartInstance = null;
+                initRadarChart();
+                if (chartData) {
+                    radarChartInstance.data.datasets[0].data = chartData;
+                    radarChartInstance.update('none');
+                }
+                return;
+            }
+            radarChartInstance.resize();
+            radarChartInstance.update('none');
         }
 
         function updateRadarChart(newData) {
