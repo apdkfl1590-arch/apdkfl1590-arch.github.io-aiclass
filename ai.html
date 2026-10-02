@@ -1,0 +1,1569 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI 기반 용접 품질 검사 및 비드 분석 시스템</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        welding: {
+                            dark: '#0f172a',
+                            panel: '#1e293b',
+                            border: '#334155',
+                            amber: '#f59e0b',
+                            neon: '#06b6d4',
+                            spark: '#ff6b00'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Pretendard:wght@300;400;600;700&display=swap');
+        body {
+            font-family: 'Pretendard', sans-serif;
+            background-color: #0b0f19;
+            color: #e2e8f0;
+        }
+        .glow-amber {
+            box-shadow: 0 0 15px rgba(245, 158, 11, 0.3);
+        }
+        .glow-neon {
+            box-shadow: 0 0 15px rgba(6, 182, 212, 0.3);
+        }
+        .bg-grid-pattern {
+            background-image: radial-gradient(rgba(51, 65, 85, 0.4) 1px, transparent 1px);
+            background-size: 20px 20px;
+        }
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #0f172a;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #334155;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #475569;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col bg-grid-pattern">
+
+    <!-- Header Navigation -->
+    <header class="bg-slate-900/90 border-b border-slate-800 backdrop-blur-md sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <div class="p-2 bg-gradient-to-tr from-amber-500 to-amber-600 rounded-lg text-slate-950 font-bold glow-amber">
+                    <i class="fa-solid fa-fire-burner text-xl"></i>
+                </div>
+                <div>
+                    <h1 class="font-bold text-lg text-white tracking-wide flex items-center gap-2">
+                        WELD-AI <span class="text-xs px-2 py-0.5 rounded bg-amber-500/20 text-amber-400 border border-amber-500/30">v2.4 Pro</span>
+                    </h1>
+                    <p class="text-xs text-slate-400">지능형 용접 비드 품질 검사 및 공정 진단 시스템</p>
+                </div>
+            </div>
+            
+            <div class="flex items-center gap-3">
+                <div class="hidden md:flex items-center gap-2 text-xs text-slate-400 bg-slate-800/80 px-3 py-1.5 rounded-full border border-slate-700">
+                    <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                    <span>AI 엔진 정상 작동 중</span>
+                </div>
+                <div class="flex items-center gap-2 bg-slate-800/80 border border-slate-700 rounded-lg px-2.5 py-1.5">
+                    <label for="inspectorName" class="text-[10px] font-semibold uppercase tracking-wide text-slate-400">작업자</label>
+                    <input id="inspectorName" type="text" maxlength="20" placeholder="이름 입력" class="w-28 bg-slate-900/80 border border-slate-700 rounded-md px-2 py-1 text-xs text-white placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-amber-500" />
+                </div>
+                <button id="reportBtn" onclick="generateInspectionPdfReport()" disabled class="px-3 py-1.5 text-xs font-semibold rounded-lg bg-slate-800 text-slate-400 border border-slate-700 flex items-center gap-1.5 transition opacity-50 cursor-not-allowed">
+                    <i class="fa-solid fa-print"></i>
+                    <span>리포트 출력</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content Area -->
+    <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+        <!-- Left Panel: Control & Image Canvas (5 Cols) -->
+        <section class="lg:col-span-5 flex flex-col gap-6">
+            
+            <!-- 1. Welding Method Selection -->
+            <div class="bg-slate-900/80 rounded-xl p-5 border border-slate-800 shadow-xl">
+                <h2 class="text-sm font-bold text-slate-200 uppercase tracking-wider mb-4 flex items-center gap-2">
+                    <i class="fa-solid fa-sliders text-amber-500"></i> 1. 용접 공법 선택 (Welding Process)
+                </h2>
+                
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5" id="weldingTypeGroup">
+                    <button onclick="selectWeldingType('SMAW')" data-type="SMAW" class="welding-type-btn text-left p-3 rounded-lg border border-amber-500 bg-amber-500/10 text-white transition flex flex-col justify-between">
+                        <span class="font-bold text-sm">SMAW (아크용접)</span>
+                        <span class="text-[11px] text-slate-400 mt-1">피복 아크 용접 / Shielded Metal Arc</span>
+                    </button>
+                    <button onclick="selectWeldingType('GMAW')" data-type="GMAW" class="welding-type-btn text-left p-3 rounded-lg border border-slate-800 bg-slate-800/50 hover:border-slate-700 text-slate-300 transition flex flex-col justify-between">
+                        <span class="font-bold text-sm">GMAW / MIG / MAG</span>
+                        <span class="text-[11px] text-slate-400 mt-1">CO2 / 가스 메탈 아크 용접</span>
+                    </button>
+                    <button onclick="selectWeldingType('GTAW')" data-type="GTAW" class="welding-type-btn text-left p-3 rounded-lg border border-slate-800 bg-slate-800/50 hover:border-slate-700 text-slate-300 transition flex flex-col justify-between">
+                        <span class="font-bold text-sm">GTAW / TIG</span>
+                        <span class="text-[11px] text-slate-400 mt-1">티그 / 알곤 비소모성 가스 용접</span>
+                    </button>
+                    <button onclick="selectWeldingType('FCAW')" data-type="FCAW" class="welding-type-btn text-left p-3 rounded-lg border border-slate-800 bg-slate-800/50 hover:border-slate-700 text-slate-300 transition flex flex-col justify-between">
+                        <span class="font-bold text-sm">FCAW</span>
+                        <span class="text-[11px] text-slate-400 mt-1">플럭스 코어드 아크 용접</span>
+                    </button>
+                    <button onclick="selectWeldingType('SAW')" data-type="SAW" class="welding-type-btn text-left p-3 rounded-lg border border-slate-800 bg-slate-800/50 hover:border-slate-700 text-slate-300 transition flex flex-col justify-between sm:col-span-2">
+                        <span class="font-bold text-sm">SAW (서브머지드)</span>
+                        <span class="text-[11px] text-slate-400 mt-1">잠호 아크 용접 / Submerged Arc Welding</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- 2. Image Upload & Canvas Box -->
+            <div id="imageAnalysisCard" class="bg-slate-900/80 rounded-xl p-5 border border-slate-800 shadow-xl flex flex-col">
+                <div class="flex items-center justify-between mb-3">
+                    <h2 class="text-sm font-bold text-slate-200 uppercase tracking-wider flex items-center gap-2">
+                        <i class="fa-solid fa-microscope text-cyan-400"></i> 2. 용접 비드 이미지 분석
+                    </h2>
+                    <span class="text-xs text-slate-400" id="currentProcessBadge">선택: SMAW</span>
+                </div>
+
+                <!-- Direct Upload & Action Bar -->
+                <div class="mb-3 flex gap-2">
+                    <button onclick="document.getElementById('fileInput').click()" class="flex-1 py-2 px-3 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-bold text-xs rounded-lg shadow flex items-center justify-center gap-2 transition">
+                        <i class="fa-solid fa-file-arrow-up text-sm"></i>
+                        <span>내 용접 사진 직접 올리기</span>
+                    </button>
+                    <button onclick="openWebcamModal()" class="py-2 px-3 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition">
+                        <i class="fa-solid fa-camera text-cyan-400"></i>
+                        <span>웹캠 촬영</span>
+                    </button>
+                </div>
+
+                <!-- Canvas Preview Container -->
+                <div class="relative bg-slate-950 rounded-lg border border-slate-800 min-h-[260px] flex items-center justify-center overflow-hidden group">
+                    <canvas id="inspectionCanvas" class="max-w-full max-h-[360px] object-contain rounded"></canvas>
+                    
+                    <!-- Empty State / Dropzone -->
+                    <div id="dropzone" class="absolute inset-0 flex flex-col items-center justify-center p-6 text-center cursor-pointer hover:bg-slate-800/40 transition">
+                        <div class="p-4 bg-slate-800/80 rounded-full mb-3 border border-slate-700 group-hover:scale-110 transition-transform">
+                            <i class="fa-solid fa-cloud-arrow-up text-3xl text-amber-400"></i>
+                        </div>
+                        <p class="text-sm font-bold text-slate-200">용접 사진 파일 Drag & Drop 또는 클릭</p>
+                        <p class="text-xs text-slate-400 mt-1">Ctrl + V 로 캡처된 이미지를 바로 붙여넣기 할 수 있습니다</p>
+                        <p class="text-[11px] text-slate-500 mt-2">지원 형식: JPG, PNG, WEBP, BMP</p>
+                        <input type="file" id="fileInput" accept="image/*" class="hidden" onchange="handleFileUpload(event)">
+                    </div>
+
+                    <!-- Reset / Change Image Floating Button -->
+                    <button id="reuploadBtn" onclick="document.getElementById('fileInput').click()" class="hidden absolute top-2 right-2 bg-slate-900/90 hover:bg-slate-800 text-slate-200 text-xs px-2.5 py-1.5 rounded-md border border-slate-700 shadow backdrop-blur transition flex items-center gap-1.5 z-10">
+                        <i class="fa-solid fa-arrow-rotate-right text-amber-400"></i>
+                        <span>다른 사진 변경</span>
+                    </button>
+
+                    <!-- Scan Line Effect (during analysis) -->
+                    <div id="scanOverlay" class="hidden absolute inset-0 bg-gradient-to-b from-cyan-500/10 via-cyan-500/20 to-transparent border-b-2 border-cyan-400 animate-pulse pointer-events-none"></div>
+                </div>
+
+                <!-- Sample Preset Buttons -->
+                <div class="mt-4">
+                    <div class="flex justify-between items-center mb-2">
+                        <label class="text-xs text-slate-400 font-medium">샘플 이미지로 시연해보기:</label>
+                        <span id="uploadedImageStatus" class="text-[11px] text-emerald-400 hidden"><i class="fa-solid fa-circle-check"></i> 사용자 사진 로드됨</span>
+                    </div>
+                    <div class="grid grid-cols-4 gap-2">
+                        <button onclick="loadSampleImage('good')" class="px-2 py-1.5 text-xs bg-slate-800 hover:bg-slate-700 text-emerald-400 rounded border border-slate-700 font-medium transition truncate">
+                            <i class="fa-solid fa-circle-check text-[10px] mr-1"></i>양호 (PASS)
+                        </button>
+                        <button onclick="loadSampleImage('porosity')" class="px-2 py-1.5 text-xs bg-slate-800 hover:bg-slate-700 text-amber-400 rounded border border-slate-700 font-medium transition truncate">
+                            <i class="fa-solid fa-triangle-exclamation text-[10px] mr-1"></i>기포 (Porosity)
+                        </button>
+                        <button onclick="loadSampleImage('spatter')" class="px-2 py-1.5 text-xs bg-slate-800 hover:bg-slate-700 text-amber-400 rounded border border-slate-700 font-medium transition truncate">
+                            <i class="fa-solid fa-spray-can text-[10px] mr-1"></i>스패터 (Spatter)
+                        </button>
+                        <button onclick="loadSampleImage('undercut')" class="px-2 py-1.5 text-xs bg-slate-800 hover:bg-slate-700 text-rose-400 rounded border border-slate-700 font-medium transition truncate">
+                            <i class="fa-solid fa-ban text-[10px] mr-1"></i>언더컷 (Undercut)
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Vision Overlay Controls -->
+                <div class="mt-4 pt-3 border-t border-slate-800/80 flex flex-wrap items-center justify-between gap-3 text-xs">
+                    <label class="flex items-center gap-2 cursor-pointer text-slate-300">
+                        <input type="checkbox" id="toggleBbox" checked onchange="drawOverlay()" class="rounded bg-slate-800 border-slate-700 text-amber-500 focus:ring-amber-500">
+                        <span>결함 검출 박스 (Bounding Box)</span>
+                    </label>
+                </div>
+
+                <!-- Analyze Action Button -->
+                <button id="analyzeBtn" onclick="runAIAnalysis()" class="mt-4 w-full py-3 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-slate-950 font-bold rounded-lg shadow-lg glow-amber transition flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-wand-magic-sparkles"></i>
+                    <span>AI 용접 품질 측정 및 진단 시작</span>
+                </button>
+            </div>
+        </section>
+
+        <!-- Right Panel: Inspection Results & Analytics (7 Cols) -->
+        <section id="resultPanel" class="lg:col-span-7 flex flex-col gap-6 hidden">
+
+            <!-- Quality Score Header Card -->
+            <div class="bg-slate-900/80 rounded-xl p-5 border border-slate-800 shadow-xl flex flex-col sm:flex-row items-center justify-between gap-6">
+                <div class="flex items-center gap-5 w-full sm:w-auto">
+                    <!-- Donut Progress Ring -->
+                    <div class="relative w-24 h-24 flex-shrink-0 flex items-center justify-center">
+                        <svg class="w-full h-full transform -rotate-90" viewBox="0 0 36 36">
+                            <path class="text-slate-800" stroke-width="3.5" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                            <path id="scoreCircle" class="text-emerald-500 transition-all duration-1000 ease-out" stroke-dasharray="88, 100" stroke-width="3.5" stroke-linecap="round" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                        </svg>
+                        <div class="absolute flex flex-col items-center justify-center text-center">
+                            <span id="scoreText" class="text-2xl font-black text-white">88%</span>
+                            <span class="text-[9px] text-slate-400 uppercase">품질 점수</span>
+                        </div>
+                    </div>
+
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <span id="passBadge" class="px-2.5 py-1 rounded text-xs font-extrabold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 tracking-wide">PASS (합격)</span>
+                            <span class="text-xs text-slate-400" id="defectCountText">결함 1건 감지됨</span>
+                        </div>
+                        <h3 class="text-lg font-bold text-white mt-1" id="resultSummaryTitle">비드 균일도 양호 및 미세 스패터</h3>
+                        <p class="text-xs text-slate-400 mt-1 leading-relaxed" id="resultSummaryDesc">
+                            전반적인 용입과 비드 폭 유지 상태는 양호하나, 용접 후반부 영역에서 미세한 스패터 잔류가 관찰됩니다.
+                        </p>
+                    </div>
+                </div>
+
+                <div class="w-full sm:w-auto border-t sm:border-t-0 sm:border-l border-slate-800 pt-4 sm:pt-0 sm:pl-6 flex sm:flex-col justify-around gap-3 text-center sm:text-left">
+                    <div>
+                        <span class="text-[10px] text-slate-400 uppercase block">비드 폭 균일성</span>
+                        <span class="text-sm font-bold text-cyan-400" id="metricBeadWidth">92.4 %</span>
+                    </div>
+                    <div>
+                        <span class="text-[10px] text-slate-400 uppercase block">표면 조도/매끄러움</span>
+                        <span class="text-sm font-bold text-amber-400" id="metricRoughness">Ra 3.2 µm</span>
+                    </div>
+                    <div>
+                        <span class="text-[10px] text-slate-400 uppercase block">예상 구조적 결함율</span>
+                        <span class="text-sm font-bold text-rose-400" id="metricDefectRate">2.1 %</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Defect Analysis Breakdown & Radar Chart -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <!-- Defect List Table -->
+                <div id="defectDetailCard" class="bg-slate-900/80 rounded-xl p-5 border border-slate-800 shadow-xl flex flex-col justify-between">
+                    <div>
+                        <h3 class="text-xs font-bold text-slate-300 uppercase tracking-wider mb-3 flex items-center justify-between">
+                            <span><i class="fa-solid fa-list-check text-amber-400 mr-1.5"></i> 검출된 결함 상세</span>
+                            <span class="text-[10px] font-normal text-slate-400">ISO 5817 기준</span>
+                        </h3>
+                        <div class="space-y-2.5" id="defectListContainer">
+                            <!-- Populated dynamically -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Radar Chart Visualization -->
+                <div id="qualityRadarCard" class="bg-slate-900/80 rounded-xl p-5 border border-slate-800 shadow-xl flex flex-col">
+                    <h3 class="text-xs font-bold text-slate-300 uppercase tracking-wider mb-2">
+                        <i class="fa-solid fa-chart-pie text-cyan-400 mr-1.5"></i> 품질 요인 다차원 평가
+                    </h3>
+                    <div class="flex-1 min-h-[180px] relative flex items-center justify-center">
+                        <canvas id="qualityRadarChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 xl:grid-cols-2 gap-6">
+                <div class="bg-slate-900/80 rounded-xl p-5 border border-slate-800 shadow-xl">
+                    <h3 class="text-xs font-bold text-slate-300 uppercase tracking-wider mb-3 flex items-center gap-2">
+                        <i class="fa-solid fa-user-graduate text-amber-400"></i> AI 튜터 피드백
+                    </h3>
+                    <div id="aiTutorFeedback" class="space-y-3 text-sm text-slate-200"></div>
+                </div>
+
+                <div class="bg-slate-900/80 rounded-xl p-5 border border-slate-800 shadow-xl">
+                    <h3 class="text-xs font-bold text-slate-300 uppercase tracking-wider mb-4 flex items-center gap-2">
+                        <i class="fa-solid fa-screwdriver-wrench text-amber-500"></i> 공정 원인 분석 및 현장 개선 가이드
+                    </h3>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div class="bg-slate-950/60 p-4 rounded-lg border border-slate-800/80">
+                            <h4 class="text-xs font-bold text-amber-400 mb-2 flex items-center gap-1.5">
+                                <i class="fa-solid fa-triangle-exclamation"></i> 추정 원인
+                            </h4>
+                            <ul class="text-xs text-slate-300 space-y-1.5 list-disc list-inside" id="causeList"></ul>
+                        </div>
+
+                        <div class="bg-slate-950/60 p-4 rounded-lg border border-slate-800/80">
+                            <h4 class="text-xs font-bold text-emerald-400 mb-2 flex items-center gap-1.5">
+                                <i class="fa-solid fa-circle-check"></i> 조치 및 파라미터 수정
+                            </h4>
+                            <ul class="text-xs text-slate-300 space-y-1.5 list-disc list-inside" id="recommendationList"></ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="historyDashboardCard" class="bg-slate-900/80 rounded-xl p-5 border border-slate-800 shadow-xl">
+                <h3 class="text-xs font-bold text-slate-300 uppercase tracking-wider mb-3 flex items-center gap-2">
+                    <i class="fa-solid fa-database text-violet-400"></i> 작업 이력 및 관리자 대시보드
+                </h3>
+                <div class="overflow-hidden rounded-lg border border-slate-700">
+                    <table class="w-full text-left text-[11px] text-slate-300">
+                        <thead class="bg-slate-800 text-slate-200">
+                            <tr>
+                                <th class="px-2 py-2">일시</th>
+                                <th class="px-2 py-2">공법</th>
+                                <th class="px-2 py-2">점수</th>
+                                <th class="px-2 py-2">작업자</th>
+                            </tr>
+                        </thead>
+                        <tbody id="historyTableBody" class="bg-slate-950/50"></tbody>
+                    </table>
+                </div>
+                <div class="mt-3 text-[11px] text-slate-400" id="historySummary">최근 이력 0건</div>
+            </div>
+
+        </section>
+    </main>
+
+    <!-- Webcam Capture Modal -->
+    <div id="webcamModal" class="hidden fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-700 rounded-xl max-w-md w-full p-5 text-slate-200 shadow-2xl">
+            <div class="flex justify-between items-center border-b border-slate-800 pb-3 mb-3">
+                <h3 class="font-bold text-sm text-white flex items-center gap-2">
+                    <i class="fa-solid fa-camera text-cyan-400"></i> 실시간 웹캠 사진 촬영
+                </h3>
+                <button onclick="closeWebcamModal()" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="relative bg-black rounded-lg overflow-hidden aspect-video flex items-center justify-center mb-4 border border-slate-800">
+                <video id="webcamVideo" autoplay playsinline class="w-full h-full object-cover"></video>
+            </div>
+            <div class="flex justify-end gap-2">
+                <button onclick="closeWebcamModal()" class="px-3 py-1.5 rounded bg-slate-800 text-xs text-slate-300">취소</button>
+                <button onclick="captureWebcam()" class="px-4 py-1.5 rounded bg-cyan-500 hover:bg-cyan-600 text-slate-950 font-bold text-xs flex items-center gap-1.5">
+                    <i class="fa-solid fa-camera"></i> 촬영 및 분석 적용
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
+        const average = (values) => values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : 0;
+        const standardDeviation = (values, meanValue = average(values)) => {
+            if (!values.length) return 0;
+            return Math.sqrt(values.reduce((sum, value) => sum + (value - meanValue) ** 2, 0) / values.length);
+        };
+
+        // App State
+        let currentProcess = 'SMAW';
+        let currentSampleKey = 'good';
+        let radarChartInstance = null;
+        let loadedImage = null;
+        let isCustomImage = false;
+        let webcamStream = null;
+        let lastDetectedWeldBox = null;
+        let analysisCompleted = false;
+        let inspectionHistory = JSON.parse(localStorage.getItem('weldInspectionHistory') || '[]');
+        let currentMetrics = {
+            score: 92,
+            beadWidth: 92.4,
+            roughness: 3.2,
+            defectRate: 2.1,
+            porosityRatio: 0.02,
+            spatterRatio: 0.04,
+            undercutRisk: 0.08
+        };
+
+        const samplePresets = {
+            good: {
+                score: 92,
+                beadWidth: '92.4 %',
+                roughness: 'Ra 3.2 µm',
+                defectRate: '2.1 %',
+                badgeText: 'PASS (합격)',
+                statusClass: 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30',
+                title: '비드 균일도 양호 및 표면 안정적',
+                desc: '용접 비드 폭과 표면 밸런스가 균일하며, 결함이 미미해 전체적으로 안정적인 상태입니다.',
+                defects: [
+                    { icon: 'fa-circle-check', name: '비드 균일도', loc: '중앙부', risk: 'Low', severity: 'Low' },
+                    { icon: 'fa-wand-sparkles', name: '표면 마감', loc: '전 구간', risk: 'Low', severity: 'Low' }
+                ],
+                causes: {
+                    SMAW: ['아크 안정도가 우수하며, 와이어 속도와 전류 밸런스가 적절합니다.', '작업 속도가 안정적이고 비드 전반에 균열이 거의 없습니다.'],
+                    GMAW: ['가스 보호가 안정적이며, 용입량이 균일합니다.', '와이어 공급과 전류가 적절하게 유지되고 있습니다.'],
+                    GTAW: ['티그 아크 안정도가 높고 비드 형상이 정렬되어 있습니다.', '열 입력이 적절해 과열·재용융이 제한됩니다.'],
+                    FCAW: ['플럭스 코어 안정성이 양호하고 비드 경계가 균일합니다.', '하중 변동이 적어 표면 결함이 거의 없습니다.'],
+                    SAW: ['서브머지드 아크 안정성과 비드 폭 균일성이 우수합니다.', '가스 및 플럭스 상태가 양호합니다.']
+                },
+                recommendations: {
+                    SMAW: ['현재 파라미터 유지가 적절합니다.', '주기적인 비드 형상 점검을 유지해 주세요.'],
+                    GMAW: ['전류 및 와이어 속도를 유지해 주세요.', '가스 유량 변화가 없는지 점검하면 더 안정적입니다.'],
+                    GTAW: ['아크 길이를 일정하게 유지해 주세요.', '용접 속도 편차를 줄이면 품질이 더욱 안정됩니다.'],
+                    FCAW: ['플럭스 및 전류 안정성을 유지해 주세요.', '비드 마감 상태를 계속 점검해 주세요.'],
+                    SAW: ['용접 속도와 비드 폭을 일정하게 유지해 주세요.', '플럭스 상태를 정기적으로 확인해 주세요.']
+                },
+                radar: [92, 88, 94, 18, 91],
+                boxes: [
+                    { x: 0.25, y: 0.22, w: 0.5, h: 0.42, color: '#34d399', label: 'GOOD' }
+                ]
+            },
+            porosity: {
+                score: 64,
+                beadWidth: '74.2 %',
+                roughness: 'Ra 6.3 µm',
+                defectRate: '18.4 %',
+                badgeText: 'REWORK (재작업)',
+                statusClass: 'bg-amber-500/20 text-amber-400 border border-amber-500/30',
+                title: '기공(포러스) 발생으로 비드 품질 저하',
+                desc: '중앙 비드 내부에 다수의 기공이 집중되어 있어 구조적 내구성이 감소할 가능성이 있습니다.',
+                defects: [
+                    { icon: 'fa-microchip', name: '기공', loc: '중앙부 1~3 구간', risk: 'High', severity: 'High' },
+                    { icon: 'fa-circle-exclamation', name: '표면 불균일', loc: '비드 전반', risk: 'Medium', severity: 'Medium' }
+                ],
+                causes: {
+                    SMAW: ['이온화 불안정 또는 전극 건조 부족으로 기공이 발생합니다.', '용접 속도 변동이 크면 기공이 집적됩니다.'],
+                    GMAW: ['가스 보호 불량 또는 불순물이 많아 기공이 형성됩니다.', '와이어 용접에 불필요한 산소 유입이 많습니다.'],
+                    GTAW: ['아르곤 가스 유량 부족 또는 아크 길이 과다로 기공이 생깁니다.', '재용융 부위에 불순물이 남아 있습니다.'],
+                    FCAW: ['플럭스 상태 불량 및 습기 유입이 기공 원인입니다.', '전류 변동이 심하면 기공이 늘어납니다.'],
+                    SAW: ['플럭스 분포 불균일과 표면 습기가 기공을 유발합니다.', '비드 폭 불균일이 심하면 기공이 생깁니다.']
+                },
+                recommendations: {
+                    SMAW: ['전극 건조 상태를 점검하고 전류를 안정화해 주세요.', '가스 차단 상태를 확인해 주세요.'],
+                    GMAW: ['가스 유량을 재조정하고, 표면 청소를 강화해 주세요.', '와이어 공급이 일정한지 확인해 주세요.'],
+                    GTAW: ['아르곤 유량과 아크 길이를 정정해 주세요.', '기판 표면을 깨끗하게 유지해 주세요.'],
+                    FCAW: ['플럭스 건조 상태와 전류 안정성을 점검해 주세요.', '습기 유입을 막아 주세요.'],
+                    SAW: ['플럭스 배분을 조정하고 와이어 속도를 안정화해 주세요.', '기판 전처리 상태를 확인해 주세요.']
+                },
+                radar: [74, 63, 78, 68, 55],
+                boxes: [
+                    { x: 0.28, y: 0.26, w: 0.42, h: 0.38, color: '#fbbf24', label: 'PORES' }
+                ]
+            },
+            spatter: {
+                score: 71,
+                beadWidth: '81.4 %',
+                roughness: 'Ra 5.7 µm',
+                defectRate: '14.8 %',
+                badgeText: 'CHECK (점검)',
+                statusClass: 'bg-amber-500/20 text-amber-400 border border-amber-500/30',
+                title: '스패터 잔류로 비드 표면 품질 저하',
+                desc: '비드 주변에 작은 금속 입자들이 튀어 붙어 표면 마감이 불균일하며 외관 결함이 발생했습니다.',
+                defects: [
+                    { icon: 'fa-spray-can', name: '스패터', loc: '비드 양측', risk: 'Medium', severity: 'Medium' },
+                    { icon: 'fa-layer-group', name: '표면 거칠기', loc: '후반부', risk: 'Medium', severity: 'Medium' }
+                ],
+                causes: {
+                    SMAW: ['전류 과다 또는 전극 각도가 불균일하게 되어 스패터가 발생합니다.', '아크 세기가 과도해 표면 부식이 생깁니다.'],
+                    GMAW: ['와이어 공급 과다 및 가스 유량 불균일이 스패터를 증가시킵니다.', '거리 편차가 커져 비드 주변에 튐 현상이 나타납니다.'],
+                    GTAW: ['아크 길이 과다와 전류 급변이 스패터를 유발합니다.', '금속 표면 오염이 누적되면 스패터가 늘어납니다.'],
+                    FCAW: ['전류 과도 및 플럭스 조건 불균일이 스패터를 증가시킵니다.', '아크 위치 변동이 심합니다.'],
+                    SAW: ['가스 보호 불량과 비드 경로 편차로 스패터가 생깁니다.', '선속과 전류가 불규칙하게 유지됩니다.']
+                },
+                recommendations: {
+                    SMAW: ['전극 각도를 일정하게 유지해 주세요.', '전류를 약간 낮춰 표면 마감을 정리해 주세요.'],
+                    GMAW: ['와이어 속도와 거리 조정을 안정화해 주세요.', '가스 유량을 재조정해 표면 응집을 줄여 주세요.'],
+                    GTAW: ['아크 길이를 줄이고 전류 급변을 억제해 주세요.', '준비 표면을 정리해 스패터 생성 가능성을 줄여 주세요.'],
+                    FCAW: ['전류와 플럭스 상태를 정렬해 주세요.', '아크 위치를 고르게 유지해 주세요.'],
+                    SAW: ['가스 보호와 비드 경로를 안정화해주세요.', '선속과 전류를 조금씩 조정해 주세요.']
+                },
+                radar: [80, 62, 86, 52, 78],
+                boxes: [
+                    { x: 0.2, y: 0.12, w: 0.62, h: 0.56, color: '#f59e0b', label: 'SPATTER' }
+                ]
+            },
+            undercut: {
+                score: 58,
+                beadWidth: '69.1 %',
+                roughness: 'Ra 7.8 µm',
+                defectRate: '22.6 %',
+                badgeText: 'FAIL (불합격)',
+                statusClass: 'bg-rose-500/20 text-rose-400 border border-rose-500/30',
+                title: '언더컷 형성으로 인한 비드 경계 약화',
+                desc: '비드 가장자리에서 국부적으로 함몰이 발생해 결합부가 약화되고, 구조적 강도에 영향을 줄 수 있습니다.',
+                defects: [
+                    { icon: 'fa-bolt', name: '언더컷', loc: '비드 좌/우 경계', risk: 'High', severity: 'High' },
+                    { icon: 'fa-signal', name: '경계 약화', loc: '후반부', risk: 'High', severity: 'High' }
+                ],
+                causes: {
+                    SMAW: ['전류 과부하와 속도 불균형이 언더컷을 유발합니다.', '아크 길이가 길어지면 가장자리가 마모됩니다.'],
+                    GMAW: ['와이어 속도와 전류의 불균형으로 경계가 소실됩니다.', '가스 보호가 약하면 경계 변형이 커집니다.'],
+                    GTAW: ['열 입력이 과해 경계부가 녹아 내려갑니다.', '아크 집중이 너무 높아 국부적 소실이 발생합니다.'],
+                    FCAW: ['최적 전류 범위를 벗어나면 비드 경계가 약해집니다.', '이동 속도가 너무 빠르면 경계가 길어집니다.'],
+                    SAW: ['선속 과다와 비드 폭 불균일이 언더컷을 유발합니다.', '열 입력이 과할 경우 경계가 얕아집니다.']
+                },
+                recommendations: {
+                    SMAW: ['전류와 이동 속도를 조정해 가장자리 손상을 줄여 주세요.', '아크 길이를 적절하게 유지해 주세요.'],
+                    GMAW: ['전류와 와이어 속도를 재조정해 비드 폭을 안정화해 주세요.', '가스 유량을 확인해 주세요.'],
+                    GTAW: ['열 입력을 낮추고, 아크 길이를 일정하게 유지해 주세요.', '속도를 조절해 경계 약화를 방지해 주세요.'],
+                    FCAW: ['전류 범위를 보정하고, 이동 속도를 줄여 주세요.', '깊이와 너비 균형을 유지해 주세요.'],
+                    SAW: ['선속과 열 입력을 낮춰 경계 변형을 줄여 주세요.', '비드 폭 균일성을 이어가 주세요.']
+                },
+                radar: [68, 59, 72, 74, 62],
+                boxes: [
+                    { x: 0.18, y: 0.18, w: 0.64, h: 0.4, color: '#fb7185', label: 'UNDERCUT' }
+                ]
+            }
+        };
+
+        window.onload = function() {
+            initRadarChart();
+            selectWeldingType('SMAW');
+            loadSampleImage('good');
+
+            const dropzone = document.getElementById('dropzone');
+            dropzone.addEventListener('dragover', (e) => { e.preventDefault(); dropzone.classList.add('bg-slate-800/60'); });
+            dropzone.addEventListener('dragleave', () => dropzone.classList.remove('bg-slate-800/60'));
+            dropzone.addEventListener('drop', (e) => {
+                e.preventDefault();
+                dropzone.classList.remove('bg-slate-800/60');
+                if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+                    processUploadedFile(e.dataTransfer.files[0]);
+                }
+            });
+            dropzone.addEventListener('click', () => document.getElementById('fileInput').click());
+
+            window.addEventListener('paste', (e) => {
+                const items = e.clipboardData.items;
+                for (let i = 0; i < items.length; i++) {
+                    if (items[i].type.indexOf('image') !== -1) {
+                        const file = items[i].getAsFile();
+                        processUploadedFile(file);
+                        break;
+                    }
+                }
+            });
+        };
+
+        function getTutorFeedback(metrics, process) {
+            if (metrics.undercutRisk > 0.18) {
+                return {
+                    title: '언더컷(Undercut) 발생',
+                    reason: `전류가 너무 높거나 이동 속도가 빠르기 때문에 비드 경계가 녹아 내려가고 있습니다. 현재 공법은 ${process} 기준으로 경계 약화 위험도가 높습니다.`,
+                    action: '전류를 10A 낮추고 토치 각도를 15° 낮춰서 경계 손상을 줄이세요. 용접 속도를 조금씩 줄여 비드 폭을 안정화하세요.'
+                };
+            }
+
+            if (metrics.porosityRatio > 0.08) {
+                return {
+                    title: '기공(Porosity) 발생',
+                    reason: `가스 보호 불량 또는 습기 유입으로 인해 기공이 형성되고 있습니다. 현재 ${process} 조건에서 용입부 표면에 공극이 누적되고 있습니다.`,
+                    action: '가스 유량을 점검하고 표면을 깨끗하게 세척하세요. 전극 또는 와이어 건조 상태를 확인하고, 아크 길이를 짧게 유지해 기공 발생을 줄이세요.'
+                };
+            }
+
+            if (metrics.spatterRatio > 0.10) {
+                return {
+                    title: '스패터(Spatter) 증가',
+                    reason: `아크 세기가 과하거나 전극 각도·거리 편차가 커서 금속 입자가 튀고 있습니다. 표면 마감 상태와 비드 경계가 불균일해지고 있습니다.`,
+                    action: '전류를 약간 낮추고 토치 각도를 일정하게 유지하세요. 와이어 공급 거리와 보호가스 유량을 재조정해 스패터 발생을 억제하세요.'
+                };
+            }
+
+            return {
+                title: '비드 상태는 전반적으로 양호',
+                reason: '현재 분석 기준으로는 결함 위험이 낮고, 비드 폭과 표면 구조가 비교적 안정적인 편입니다.',
+                action: '현재 파라미터를 유지하고, 정기적으로 비드 폭과 표면 마감을 점검해 품질 편차가 생기지 않도록 관리하세요.'
+            };
+        }
+
+        function renderTutorFeedback() {
+            const feedback = getTutorFeedback(currentMetrics, currentProcess);
+            const container = document.getElementById('aiTutorFeedback');
+            if (!container) return;
+            container.innerHTML = `
+                <div class="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3">
+                    <div class="text-xs font-bold text-amber-300 uppercase tracking-wider mb-2">원인 분석</div>
+                    <p class="font-bold text-white mb-1">${feedback.title}</p>
+                    <p class="text-slate-300 leading-6">${feedback.reason}</p>
+                </div>
+                <div class="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3">
+                    <div class="text-xs font-bold text-emerald-300 uppercase tracking-wider mb-2">조치 가이드</div>
+                    <p class="text-slate-200 leading-6">${feedback.action}</p>
+                </div>
+            `;
+        }
+
+        function getInspectorName() {
+            const input = document.getElementById('inspectorName');
+            if (!input) return '';
+            return input.value.trim();
+        }
+
+        function renderHistoryTable() {
+            const tbody = document.getElementById('historyTableBody');
+            if (!tbody) return;
+            tbody.innerHTML = '';
+
+            inspectionHistory.forEach(item => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td class="px-2 py-2 border-b border-slate-800">${item.date}</td>
+                    <td class="px-2 py-2 border-b border-slate-800">${item.process}</td>
+                    <td class="px-2 py-2 border-b border-slate-800">${item.score}</td>
+                    <td class="px-2 py-2 border-b border-slate-800">${item.inspector || item.result || '미기재'}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+
+            const summary = document.getElementById('historySummary');
+            if (summary) summary.innerText = `최근 이력 ${inspectionHistory.length}건`;
+        }
+
+        function saveInspectionHistory() {
+            const data = applyMetricsToPreset(currentSampleKey, currentMetrics);
+            const workerName = getInspectorName() || '미기재';
+            const entry = {
+                date: new Date().toLocaleString('ko-KR'),
+                process: currentProcess,
+                score: data.score,
+                result: data.badgeText,
+                inspector: workerName
+            };
+
+            inspectionHistory = [entry, ...inspectionHistory].slice(0, 8);
+            localStorage.setItem('weldInspectionHistory', JSON.stringify(inspectionHistory));
+            renderHistoryTable();
+        }
+
+        function outputReportToHistory() {
+            saveInspectionHistory();
+            const summary = document.getElementById('historySummary');
+            if (summary) summary.innerText = '최근 이력 저장 완료';
+        }
+
+        async function generateInspectionPdfReport() {
+            const resultPanel = document.getElementById('resultPanel');
+            if (!analysisCompleted || !resultPanel || resultPanel.classList.contains('hidden')) {
+                alert('용접 품질 측정 및 진단 시작을 먼저 실행한 뒤 결과가 표시된 상태에서 리포트 출력을 해주세요.');
+                return;
+            }
+
+            const workerName = getInspectorName();
+            if (!workerName) {
+                alert('작업자 이름을 입력해 주세요. 이름을 입력해야 리포트가 저장됩니다.');
+                const input = document.getElementById('inspectorName');
+                if (input) input.focus();
+                return;
+            }
+
+            if (!window.jspdf || !window.jspdf.jsPDF) {
+                alert('PDF 라이브러리 로딩 중입니다. 잠시 후 다시 시도해 주세요.');
+                return;
+            }
+
+            const inspectionCanvas = document.getElementById('inspectionCanvas');
+            const radarCanvas = document.getElementById('qualityRadarChart');
+            const passBadge = document.getElementById('passBadge');
+            const scoreText = document.getElementById('scoreText');
+            const aiTutorFeedback = document.getElementById('aiTutorFeedback');
+            const causeList = document.getElementById('causeList');
+            const recommendationList = document.getElementById('recommendationList');
+
+            if (!inspectionCanvas || !radarCanvas) {
+                alert('분석 결과 캔버스를 찾지 못했습니다. 다시 시도해 주세요.');
+                return;
+            }
+
+            try {
+                const reportCanvas = document.createElement('canvas');
+                reportCanvas.width = 1200;
+                reportCanvas.height = 1650;
+                const ctx = reportCanvas.getContext('2d');
+
+                function roundedRect(x, y, w, h, r) {
+                    ctx.beginPath();
+                    ctx.moveTo(x + r, y);
+                    ctx.lineTo(x + w - r, y);
+                    ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+                    ctx.lineTo(x + w, y + h - r);
+                    ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+                    ctx.lineTo(x + r, y + h);
+                    ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+                    ctx.lineTo(x, y + r);
+                    ctx.quadraticCurveTo(x, y, x + r, y);
+                    ctx.closePath();
+                }
+
+                function wrapText(text, maxWidth, maxLines) {
+                    const words = String(text || '').split(/\s+/);
+                    const lines = [];
+                    let current = '';
+
+                    words.forEach(word => {
+                        const candidate = current ? `${current} ${word}` : word;
+                        if (ctx.measureText(candidate).width <= maxWidth || !current) {
+                            current = candidate;
+                        } else {
+                            lines.push(current);
+                            current = word;
+                        }
+                    });
+                    if (current) lines.push(current);
+                    return lines.slice(0, maxLines);
+                }
+
+                function drawMetricTile(x, y, w, h, label, value, color) {
+                    roundedRect(x, y, w, h, 16);
+                    ctx.fillStyle = '#0f172a';
+                    ctx.fill();
+                    ctx.strokeStyle = 'rgba(148, 163, 184, 0.18)';
+                    ctx.stroke();
+
+                    ctx.fillStyle = '#94a3b8';
+                    ctx.font = '12px sans-serif';
+                    ctx.fillText(label, x + 18, y + 30);
+
+                    ctx.fillStyle = color;
+                    ctx.font = 'bold 26px sans-serif';
+                    ctx.fillText(value, x + 18, y + 68);
+                }
+
+                function drawDonut(cx, cy, radius, percent, ringColor) {
+                    ctx.beginPath();
+                    ctx.lineWidth = 16;
+                    ctx.strokeStyle = 'rgba(148, 163, 184, 0.2)';
+                    ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+                    ctx.stroke();
+
+                    ctx.beginPath();
+                    ctx.strokeStyle = ringColor;
+                    ctx.lineCap = 'round';
+                    ctx.arc(cx, cy, radius, -Math.PI / 2, -Math.PI / 2 + (percent / 100) * Math.PI * 2);
+                    ctx.stroke();
+
+                    ctx.fillStyle = '#e2e8f0';
+                    ctx.font = 'bold 36px sans-serif';
+                    ctx.textAlign = 'center';
+                    ctx.fillText(`${Math.round(percent)}%`, cx, cy + 12);
+                    ctx.font = '12px sans-serif';
+                    ctx.fillStyle = '#94a3b8';
+                    ctx.fillText('품질 점수', cx, cy + 38);
+                    ctx.textAlign = 'left';
+                }
+
+                ctx.fillStyle = '#0b0f19';
+                ctx.fillRect(0, 0, reportCanvas.width, reportCanvas.height);
+
+                // Header
+                roundedRect(36, 28, 1128, 92, 18);
+                ctx.fillStyle = '#111827';
+                ctx.fill();
+                ctx.strokeStyle = 'rgba(100, 116, 139, 0.4)';
+                ctx.stroke();
+
+                ctx.fillStyle = '#f8fafc';
+                ctx.font = 'bold 32px sans-serif';
+                ctx.fillText('WELD-AI', 70, 70);
+                ctx.fillStyle = '#94a3b8';
+                ctx.font = '18px sans-serif';
+                ctx.fillText('용접 품질 검사 보고서', 250, 70);
+
+                ctx.fillStyle = '#cbd5e1';
+                ctx.font = '14px sans-serif';
+                ctx.fillText(`검사 일시: ${new Date().toLocaleString('ko-KR')}`, 900, 58);
+                ctx.fillText(`공법: ${currentProcess} / 작업자: ${workerName}`, 900, 82);
+
+                const passLabel = passBadge ? passBadge.innerText : '판정 미확인';
+                const scoreLabel = scoreText ? scoreText.innerText : '0%';
+                const scoreValue = Number(String(scoreLabel).replace('%', '') || 0);
+                const titleText = document.getElementById('resultSummaryTitle')?.innerText || '용접 품질 결과';
+                const descText = document.getElementById('resultSummaryDesc')?.innerText || '용접 상태를 확인할 수 없습니다.';
+                const defectCountText = document.getElementById('defectCountText')?.innerText || '결함 0건 감지됨';
+                const metricBead = document.getElementById('metricBeadWidth')?.innerText || '0 %';
+                const metricRough = document.getElementById('metricRoughness')?.innerText || 'Ra 0';
+                const metricDefect = document.getElementById('metricDefectRate')?.innerText || '0 %';
+
+                // Summary panel
+                roundedRect(36, 144, 1128, 248, 20);
+                ctx.fillStyle = '#0f172a';
+                ctx.fill();
+                ctx.strokeStyle = 'rgba(148, 163, 184, 0.18)';
+                ctx.stroke();
+
+                drawDonut(158, 270, 82, scoreValue, scoreValue >= 80 ? '#34d399' : scoreValue >= 60 ? '#fbbf24' : '#f87171');
+
+                ctx.fillStyle = '#f8fafc';
+                ctx.font = 'bold 22px sans-serif';
+                ctx.fillText(passLabel, 280, 206);
+
+                ctx.fillStyle = '#f8fafc';
+                ctx.font = 'bold 38px sans-serif';
+                const summaryLines = wrapText(titleText, 500, 2);
+                summaryLines.forEach((line, idx) => {
+                    ctx.fillText(line, 280, 246 + idx * 36);
+                });
+
+                ctx.fillStyle = '#94a3b8';
+                ctx.font = '18px sans-serif';
+                const detailLines = wrapText(descText, 520, 3);
+                detailLines.forEach((line, idx) => {
+                    ctx.fillText(line, 280, 332 + idx * 28);
+                });
+
+                ctx.fillStyle = '#94a3b8';
+                ctx.font = '15px sans-serif';
+                ctx.fillText(defectCountText, 280, 392);
+
+                drawMetricTile(760, 178, 300, 72, '비드 폭 균일성', metricBead, '#22d3ee');
+                drawMetricTile(760, 264, 300, 72, '표면 조도/매끄러움', metricRough, '#fbbf24');
+                drawMetricTile(760, 350, 300, 72, '예상 구조적 결함율', metricDefect, '#fb7185');
+
+                // Defect card and radar card
+                roundedRect(36, 430, 560, 300, 18);
+                ctx.fillStyle = '#0f172a';
+                ctx.fill();
+                ctx.strokeStyle = 'rgba(148, 163, 184, 0.18)';
+                ctx.stroke();
+
+                ctx.fillStyle = '#f8fafc';
+                ctx.font = 'bold 18px sans-serif';
+                ctx.fillText('검출된 결함 상세', 62, 468);
+                ctx.fillStyle = '#94a3b8';
+                ctx.font = '12px sans-serif';
+                ctx.fillText('ISO 5817 기준', 472, 468);
+
+                const defectItems = [...document.querySelectorAll('#defectListContainer > div')].map(item => item.textContent.replace(/\s+/g, ' ').trim());
+                defectItems.forEach((item, idx) => {
+                    const y = 500 + idx * 84;
+                    roundedRect(58, y, 500, 60, 12);
+                    ctx.fillStyle = 'rgba(15, 23, 42, 0.9)';
+                    ctx.fill();
+                    ctx.strokeStyle = 'rgba(148, 163, 184, 0.14)';
+                    ctx.stroke();
+                    ctx.fillStyle = '#e2e8f0';
+                    ctx.font = '15px sans-serif';
+                    const lines = wrapText(item, 330, 2);
+                    lines.forEach((line, lineIndex) => {
+                        ctx.fillText(line, 76, y + 22 + lineIndex * 18);
+                    });
+                    const riskText = item.includes('기공') ? 'High' : item.includes('표면') ? 'Medium' : 'High';
+                    ctx.fillStyle = riskText === 'High' ? '#f87171' : '#fbbf24';
+                    ctx.font = 'bold 11px sans-serif';
+                    ctx.fillText(`위험도: ${riskText}`, 402, y + 35);
+                });
+
+                // Radar chart panel
+                roundedRect(620, 430, 544, 300, 18);
+                ctx.fillStyle = '#0f172a';
+                ctx.fill();
+                ctx.strokeStyle = 'rgba(148, 163, 184, 0.18)';
+                ctx.stroke();
+
+                ctx.fillStyle = '#f8fafc';
+                ctx.font = 'bold 18px sans-serif';
+                ctx.fillText('품질 요인 다차원 평가', 646, 468);
+
+                const radarImage = new Image();
+                radarImage.src = radarCanvas.toDataURL('image/png');
+                await new Promise((resolve, reject) => {
+                    radarImage.onload = resolve;
+                    radarImage.onerror = reject;
+                });
+                ctx.drawImage(radarImage, 678, 500, 430, 200);
+
+                // Bottom status strip
+                roundedRect(36, 760, 1128, 122, 18);
+                ctx.fillStyle = '#0f172a';
+                ctx.fill();
+                ctx.strokeStyle = 'rgba(148, 163, 184, 0.18)';
+                ctx.stroke();
+
+                ctx.fillStyle = '#cbd5e1';
+                ctx.font = '14px sans-serif';
+                ctx.fillText('결과 요약', 60, 804);
+                ctx.fillStyle = '#f8fafc';
+                ctx.font = 'bold 24px sans-serif';
+                ctx.fillText(`${passLabel} · ${scoreLabel}`, 60, 842);
+                ctx.fillStyle = '#94a3b8';
+                ctx.font = '16px sans-serif';
+                const summaryFooter = `검사 기준: ${currentProcess} | 판정: ${passLabel} | 결함 감지: ${defectItems.length}건 | 작업자: ${workerName}`;
+                ctx.fillText(summaryFooter, 60, 872, 990);
+
+                // Uploaded image section
+                roundedRect(36, 900, 1128, 420, 18);
+                ctx.fillStyle = '#0f172a';
+                ctx.fill();
+                ctx.strokeStyle = 'rgba(148, 163, 184, 0.18)';
+                ctx.stroke();
+
+                ctx.fillStyle = '#f8fafc';
+                ctx.font = 'bold 18px sans-serif';
+                ctx.fillText('업로드된 용접 이미지', 60, 938);
+                ctx.fillStyle = '#94a3b8';
+                ctx.font = '12px sans-serif';
+                ctx.fillText('검사 원본 이미지 / 현장 촬영 이미지', 60, 962);
+
+                const uploadedImage = new Image();
+                const uploadSrc = loadedImage && (loadedImage.src || loadedImage.currentSrc)
+                    ? (loadedImage.src || loadedImage.currentSrc)
+                    : inspectionCanvas.toDataURL('image/png');
+
+                uploadedImage.src = uploadSrc;
+                await new Promise((resolve, reject) => {
+                    uploadedImage.onload = resolve;
+                    uploadedImage.onerror = reject;
+                });
+
+                const imgBoxX = 90;
+                const imgBoxY = 980;
+                const imgBoxW = 1020;
+                const imgBoxH = 300;
+                const ratio = Math.min(imgBoxW / uploadedImage.width, imgBoxH / uploadedImage.height);
+                const drawW = uploadedImage.width * ratio;
+                const drawH = uploadedImage.height * ratio;
+                const drawX = imgBoxX + (imgBoxW - drawW) / 2;
+                const drawY = imgBoxY + (imgBoxH - drawH) / 2;
+
+                roundedRect(imgBoxX, imgBoxY, imgBoxW, imgBoxH, 14);
+                ctx.fillStyle = 'rgba(15, 23, 42, 0.9)';
+                ctx.fill();
+                ctx.drawImage(uploadedImage, drawX, drawY, drawW, drawH);
+
+                const { jsPDF } = window.jspdf;
+                const doc = new jsPDF('p', 'mm', 'a4');
+                const pageWidth = 210;
+                const pageHeight = 297;
+                const margin = 9;
+                const imageData = reportCanvas.toDataURL('image/png');
+                const fitRatio = Math.min(
+                    (pageWidth - margin * 2) / reportCanvas.width,
+                    (pageHeight - margin * 2) / reportCanvas.height
+                );
+                const imgWidth = reportCanvas.width * fitRatio;
+                const imgHeight = reportCanvas.height * fitRatio;
+                const imgX = (pageWidth - imgWidth) / 2;
+                const imgY = (pageHeight - imgHeight) / 2;
+
+                doc.addImage(imageData, 'PNG', imgX, imgY, imgWidth, imgHeight, undefined, 'FAST');
+                doc.save(`weld_report_${workerName}_${currentProcess}_${new Date().toISOString().slice(0, 10)}.pdf`);
+                saveInspectionHistory();
+                alert('결과가 깔끔한 리포트 형식으로 저장되었고, 작업 이력이 기록되었습니다.');
+            } catch (error) {
+                console.error('PDF capture error:', error);
+                alert('PDF 캡처 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.');
+            }
+        }
+
+        function setResultsVisible(visible) {
+            const panel = document.getElementById('resultPanel');
+            const reportBtn = document.getElementById('reportBtn');
+            if (!panel) return;
+            analysisCompleted = visible;
+            panel.classList.toggle('hidden', !visible);
+            if (reportBtn) {
+                reportBtn.disabled = !visible;
+                reportBtn.classList.toggle('opacity-50', !visible);
+                reportBtn.classList.toggle('cursor-not-allowed', !visible);
+                reportBtn.classList.toggle('bg-slate-800', true);
+                reportBtn.classList.toggle('text-slate-400', !visible);
+                reportBtn.classList.toggle('text-slate-200', visible);
+                reportBtn.classList.toggle('hover:bg-slate-700', visible);
+                if (visible) {
+                    reportBtn.title = '분석 결과를 PDF로 저장합니다';
+                } else {
+                    reportBtn.title = '분석 완료 후 이용 가능';
+                }
+            }
+        }
+
+        function recommendWeldingProcessForImage(info) {
+            if (info.undercutRisk > 0.22) return 'SMAW';
+            if (info.spatterRatio > 0.16 || info.roughness > 5.2) return 'GMAW';
+            if (info.beadWidth > 90 && info.roughness < 4.4) return 'SAW';
+            if (info.porosityRatio > 0.10 || info.defectRate > 18) return 'GTAW';
+            if (info.beadWidth < 75) return 'GTAW';
+            return 'SMAW';
+        }
+
+        function selectWeldingType(type) {
+            currentProcess = type;
+            const buttons = document.querySelectorAll('.welding-type-btn');
+            buttons.forEach(btn => {
+                if (btn.dataset.type === type) {
+                    btn.classList.remove('border-slate-800', 'bg-slate-800/50', 'text-slate-300');
+                    btn.classList.add('border-amber-500', 'bg-amber-500/10', 'text-white');
+                } else {
+                    btn.classList.add('border-slate-800', 'bg-slate-800/50', 'text-slate-300');
+                    btn.classList.remove('border-amber-500', 'bg-amber-500/10', 'text-white');
+                }
+            });
+            document.getElementById('currentProcessBadge').innerText = `선택: ${type}`;
+            if (document.getElementById('resultPanel') && !document.getElementById('resultPanel').classList.contains('hidden')) {
+                updateDashboardText();
+            }
+        }
+
+        function computeImageMetrics(ctx, w, h) {
+            const imageData = ctx.getImageData(0, 0, w, h).data;
+            const totalPixels = w * h;
+            let brightnessSum = 0;
+            let darkPixels = 0;
+            let brightPixels = 0;
+            let centralDefectPixels = 0;
+            let centralPixels = 0;
+            const rowCenters = [];
+            const rowWidths = [];
+
+            for (let y = 0; y < h; y += 2) {
+                let rowMin = w;
+                let rowMax = 0;
+                let rowDarkPixels = 0;
+                for (let x = 0; x < w; x += 2) {
+                    const index = (y * w + x) * 4;
+                    const r = imageData[index];
+                    const g = imageData[index + 1];
+                    const b = imageData[index + 2];
+                    const brightness = (r + g + b) / 3;
+                    brightnessSum += brightness;
+
+                    if (brightness < 70) {
+                        darkPixels += 1;
+                        rowDarkPixels += 1;
+                    }
+                    if (brightness > 180) {
+                        brightPixels += 1;
+                    }
+
+                    const isCentralBand = y > h * 0.2 && y < h * 0.8;
+                    if (isCentralBand) {
+                        centralPixels += 1;
+                        if (brightness < 110) {
+                            centralDefectPixels += 1;
+                        }
+                    }
+
+                    if (Math.abs(x - w * 0.5) < w * 0.35 && brightness < 150) {
+                        rowMin = Math.min(rowMin, x);
+                        rowMax = Math.max(rowMax, x);
+                    }
+                }
+
+                if (rowMax > rowMin) {
+                    const width = rowMax - rowMin;
+                    rowWidths.push(width);
+                    rowCenters.push((rowMin + rowMax) / 2);
+                }
+            }
+
+            const meanBrightness = brightnessSum / totalPixels;
+            const darkRatio = darkPixels / totalPixels;
+            const brightRatio = brightPixels / totalPixels;
+            const centralDefectRatio = centralDefectPixels / Math.max(1, centralPixels);
+
+            const meanWidth = average(rowWidths);
+            const widthStd = standardDeviation(rowWidths, meanWidth);
+            const centerStd = standardDeviation(rowCenters, average(rowCenters));
+
+            const beadUniformity = clamp(100 - (widthStd / Math.max(meanWidth, 1)) * 100, 0, 100);
+            const porosityRatio = clamp(centralDefectRatio * 1.8 + darkRatio * 0.9, 0, 1);
+            const spatterRatio = clamp(brightRatio * 3.0 + darkRatio * 0.25, 0, 1);
+            const undercutRisk = clamp((widthStd / Math.max(meanWidth, 1)) * 1.2 + (centerStd / Math.max(w, 1)) * 30, 0, 1);
+
+            let score = 100;
+            score -= porosityRatio * 58;
+            score -= spatterRatio * 26;
+            score -= undercutRisk * 42;
+            score -= Math.max(0, (meanBrightness - 125) / 20);
+            score = clamp(Math.round(score), 0, 100);
+
+            return {
+                score,
+                beadWidth: clamp(beadUniformity, 0, 100),
+                roughness: clamp(2.0 + darkRatio * 22 + brightRatio * 18 + undercutRisk * 12, 1.5, 12.5),
+                defectRate: clamp((porosityRatio * 38) + (spatterRatio * 24) + (undercutRisk * 20), 0, 100),
+                porosityRatio,
+                spatterRatio,
+                undercutRisk
+            };
+        }
+
+        function classifyImage(metrics) {
+            const riskMap = [
+                { key: 'porosity', score: metrics.porosityRatio * 5 + metrics.defectRate / 20 },
+                { key: 'spatter', score: metrics.spatterRatio * 4.5 + metrics.roughness / 7 },
+                { key: 'undercut', score: metrics.undercutRisk * 6 + (100 - metrics.beadWidth) / 12 },
+                { key: 'good', score: 1.0 }
+            ];
+
+            const best = riskMap.reduce((winner, candidate) => {
+                if (candidate.score > winner.score) return candidate;
+                return winner;
+            }, riskMap[0]);
+
+            if (best.key === 'good' && metrics.score >= 82) return 'good';
+            if (best.key === 'porosity' && metrics.porosityRatio >= 0.08) return 'porosity';
+            if (best.key === 'spatter' && metrics.spatterRatio >= 0.10) return 'spatter';
+            if (best.key === 'undercut' && metrics.undercutRisk >= 0.18) return 'undercut';
+            return 'good';
+        }
+
+        function estimateDefectRegion(ctx, w, h, metrics) {
+            const imageData = ctx.getImageData(0, 0, w, h).data;
+            const defectThreshold = 0.18 + metrics.undercutRisk * 0.4 + metrics.porosityRatio * 0.5 + metrics.spatterRatio * 0.3;
+            let minX = w, maxX = 0, minY = h, maxY = 0;
+            let found = false;
+
+            for (let y = Math.floor(h * 0.15); y < h * 0.85; y += 4) {
+                let rowMin = w;
+                let rowMax = 0;
+                let rowDefectCount = 0;
+
+                for (let x = 0; x < w; x += 4) {
+                    const index = (y * w + x) * 4;
+                    const r = imageData[index];
+                    const g = imageData[index + 1];
+                    const b = imageData[index + 2];
+                    const brightness = (r + g + b) / 3;
+                    const centerBias = Math.abs(x - w * 0.5) / (w * 0.5);
+                    const isDanger = brightness < 150 && (centerBias < 1.2 || defectThreshold > 0.3);
+
+                    if (isDanger) {
+                        rowDefectCount++;
+                        rowMin = Math.min(rowMin, x);
+                        rowMax = Math.max(rowMax, x);
+                    }
+                }
+
+                if (rowDefectCount > 12) {
+                    found = true;
+                    minX = Math.min(minX, rowMin);
+                    maxX = Math.max(maxX, rowMax);
+                    minY = Math.min(minY, y);
+                    maxY = Math.max(maxY, y + 16);
+                }
+            }
+
+            if (!found || metrics.score >= 86 && metrics.defectRate < 5) {
+                return null;
+            }
+
+            const padX = Math.max(18, w * 0.05);
+            const padY = Math.max(18, h * 0.08);
+            minX = clamp(minX - padX, 0, w - 1);
+            maxX = clamp(maxX + padX, 0, w);
+            minY = clamp(minY - padY, 0, h - 1);
+            maxY = clamp(maxY + padY, 0, h);
+
+            return {
+                x: minX / w,
+                y: minY / h,
+                w: (maxX - minX) / w,
+                h: (maxY - minY) / h,
+                color: '#f87171',
+                label: 'DEFECT'
+            };
+        }
+
+        function applyMetricsToPreset(key, metrics) {
+            const preset = samplePresets[key] || samplePresets.good;
+            const result = {
+                ...preset,
+                score: Math.max(0, Math.min(100, metrics.score || preset.score)),
+                beadWidth: `${clamp(metrics.beadWidth || parseFloat(preset.beadWidth), 0, 100).toFixed(1)} %`,
+                roughness: `Ra ${(metrics.roughness || parseFloat(preset.roughness)).toFixed(1)} µm`,
+                defectRate: `${clamp(metrics.defectRate || parseFloat(preset.defectRate), 0, 100).toFixed(1)} %`,
+                radar: [
+                    clamp(metrics.beadWidth || 92, 0, 100),
+                    clamp(100 - (metrics.roughness || 3.2) * 4.8, 0, 100),
+                    clamp(86 + (metrics.beadWidth || 92) * 0.12, 0, 100),
+                    clamp(100 - (metrics.defectRate || 2.1) * 3.8, 0, 100),
+                    clamp(100 - (metrics.porosityRatio || 0.02) * 150, 0, 100)
+                ]
+            };
+
+            if (result.score >= 85) {
+                result.badgeText = 'PASS (합격)';
+                result.statusClass = 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30';
+                result.title = '비드 균일도 양호 및 표면 안정적';
+                result.desc = '용접 비드 폭과 표면 상태가 균일해 전반적으로 안정적인 품질을 유지하고 있습니다.';
+            } else if (key === 'porosity' || metrics.porosityRatio > 0.08) {
+                result.badgeText = 'REWORK (재작업)';
+                result.statusClass = 'bg-amber-500/20 text-amber-400 border border-amber-500/30';
+                result.title = '기공(포러스) 발생으로 비드 품질 저하';
+                result.desc = '중앙 비드 내부에 기공이 집적되어 있어 구조적 내구성과 표면 품질이 떨어지고 있습니다.';
+            } else if (key === 'spatter' || metrics.spatterRatio > 0.1) {
+                result.badgeText = 'CHECK (점검)';
+                result.statusClass = 'bg-amber-500/20 text-amber-400 border border-amber-500/30';
+                result.title = '스패터 잔류로 비드 표면 품질 저하';
+                result.desc = '비드 주변에 금속 입자가 잔류해 표면 마감과 외관 품질이 불량합니다.';
+            } else if (key === 'undercut' || metrics.undercutRisk > 0.18) {
+                result.badgeText = 'FAIL (불합격)';
+                result.statusClass = 'bg-rose-500/20 text-rose-400 border border-rose-500/30';
+                result.title = '언더컷 형성으로 인한 비드 경계 약화';
+                result.desc = '비드 경계가 국부적으로 불균일해 결합부 약화와 응력 집중 가능성이 있습니다.';
+            }
+
+            return result;
+        }
+
+        function loadSampleImage(key) {
+            isCustomImage = false;
+            currentSampleKey = key;
+            document.getElementById('dropzone').classList.add('hidden');
+            document.getElementById('reuploadBtn').classList.add('hidden');
+            document.getElementById('uploadedImageStatus').classList.add('hidden');
+
+            const canvas = document.getElementById('inspectionCanvas');
+            const ctx = canvas.getContext('2d');
+            canvas.width = 600;
+            canvas.height = 340;
+
+            ctx.fillStyle = '#1e293b';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            ctx.strokeStyle = '#334155';
+            ctx.lineWidth = 1;
+            for (let i = 0; i < canvas.height; i += 12) {
+                ctx.beginPath();
+                ctx.moveTo(0, i);
+                ctx.lineTo(canvas.width, i + (Math.sin(i) * 5));
+                ctx.stroke();
+            }
+
+            ctx.fillStyle = '#64748b';
+            ctx.beginPath();
+            ctx.ellipse(300, 170, 240, 45, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            for (let x = 80; x < 520; x += 16) {
+                ctx.strokeStyle = key === 'undercut' && x > 200 && x < 380 ? '#475569' : '#94a3b8';
+                ctx.lineWidth = 3;
+                ctx.beginPath();
+                ctx.arc(x, 170, 40, -Math.PI / 2, Math.PI / 2, false);
+                ctx.stroke();
+            }
+
+            if (key === 'porosity') {
+                ctx.fillStyle = '#0f172a';
+                [{ x: 200, y: 165 }, { x: 230, y: 175 }, { x: 340, y: 155 }, { x: 360, y: 168 }].forEach(p => {
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y, 6 + Math.random() * 4, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.strokeStyle = '#cbd5e1';
+                    ctx.stroke();
+                });
+            } else if (key === 'spatter') {
+                ctx.fillStyle = '#cbd5e1';
+                for (let i = 0; i < 35; i++) {
+                    const sx = 100 + Math.random() * 400;
+                    const sy = (Math.random() > 0.5 ? 90 : 230) + (Math.random() * 40 - 20);
+                    ctx.beginPath();
+                    ctx.arc(sx, sy, 2 + Math.random() * 3, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            } else if (key === 'undercut') {
+                ctx.strokeStyle = '#0f172a';
+                ctx.lineWidth = 6;
+                ctx.beginPath();
+                ctx.moveTo(150, 128);
+                ctx.lineTo(450, 128);
+                ctx.stroke();
+            }
+
+            const img = new Image();
+            img.src = canvas.toDataURL();
+            img.onload = () => {
+                loadedImage = img;
+                currentMetrics = {
+                    score: samplePresets[key].score,
+                    beadWidth: parseFloat(samplePresets[key].beadWidth),
+                    roughness: parseFloat(samplePresets[key].roughness.replace(/[^\d.]/g, '')),
+                    defectRate: parseFloat(samplePresets[key].defectRate),
+                    porosityRatio: key === 'porosity' ? 0.22 : 0.02,
+                    spatterRatio: key === 'spatter' ? 0.16 : 0.04,
+                    undercutRisk: key === 'undercut' ? 0.32 : 0.08
+                };
+                lastDetectedWeldBox = estimateDefectRegion(ctx, canvas.width, canvas.height, currentMetrics) || (samplePresets[key].boxes && samplePresets[key].boxes[0]);
+                setResultsVisible(false);
+                drawOverlay();
+                updateDashboardText();
+            };
+        }
+
+        function handleFileUpload(event) {
+            const file = event.target.files[0];
+            if (file) processUploadedFile(file);
+        }
+
+        function processUploadedFile(file) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const img = new Image();
+                img.onload = function() {
+                    isCustomImage = true;
+                    const canvas = document.getElementById('inspectionCanvas');
+                    canvas.width = 600;
+                    canvas.height = 340;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, 600, 340);
+                    loadedImage = img;
+
+                    document.getElementById('dropzone').classList.add('hidden');
+                    document.getElementById('reuploadBtn').classList.remove('hidden');
+                    document.getElementById('uploadedImageStatus').classList.remove('hidden');
+
+                    analysisCompleted = false;
+                    const analysisMetrics = computeImageMetrics(ctx, canvas.width, canvas.height);
+                    currentMetrics = analysisMetrics;
+                    currentSampleKey = classifyImage(analysisMetrics);
+                    const recommendedProcess = recommendWeldingProcessForImage(analysisMetrics);
+                    selectWeldingType(recommendedProcess);
+                    lastDetectedWeldBox = estimateDefectRegion(ctx, canvas.width, canvas.height, analysisMetrics);
+                    drawOverlay();
+                    setResultsVisible(false);
+                    updateDashboardText();
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function analyzeCustomUploadedImage(ctx, w, h) {
+            const analysisMetrics = computeImageMetrics(ctx, w, h);
+            currentMetrics = analysisMetrics;
+            currentSampleKey = classifyImage(analysisMetrics);
+        }
+
+        async function openWebcamModal() {
+            document.getElementById('webcamModal').classList.remove('hidden');
+            try {
+                webcamStream = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 360 } });
+                document.getElementById('webcamVideo').srcObject = webcamStream;
+            } catch (err) {
+                alert('웹캠에 접근할 수 없습니다. 권한을 확인해주세요.');
+                closeWebcamModal();
+            }
+        }
+
+        function closeWebcamModal() {
+            if (webcamStream) {
+                webcamStream.getTracks().forEach(track => track.stop());
+                webcamStream = null;
+            }
+            document.getElementById('webcamModal').classList.add('hidden');
+        }
+
+        function captureWebcam() {
+            const video = document.getElementById('webcamVideo');
+            const canvas = document.createElement('canvas');
+            canvas.width = 600;
+            canvas.height = 340;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(video, 0, 0, 600, 340);
+
+            const img = new Image();
+            img.onload = function() {
+                isCustomImage = true;
+                loadedImage = img;
+                const inspectCanvas = document.getElementById('inspectionCanvas');
+                inspectCanvas.width = 600;
+                inspectCanvas.height = 340;
+                inspectCanvas.getContext('2d').drawImage(img, 0, 0, 600, 340);
+
+                document.getElementById('dropzone').classList.add('hidden');
+                document.getElementById('reuploadBtn').classList.remove('hidden');
+                document.getElementById('uploadedImageStatus').classList.remove('hidden');
+
+                analyzeCustomUploadedImage(inspectCanvas.getContext('2d'), 600, 340);
+                analysisCompleted = false;
+                const recommendedProcess = recommendWeldingProcessForImage(currentMetrics);
+                selectWeldingType(recommendedProcess);
+                lastDetectedWeldBox = estimateDefectRegion(inspectCanvas.getContext('2d'), 600, 340, currentMetrics);
+                drawOverlay();
+                setResultsVisible(false);
+                updateDashboardText();
+                closeWebcamModal();
+            };
+            img.src = canvas.toDataURL('image/png');
+        }
+
+        function drawOverlay() {
+            if (!loadedImage) return;
+            const canvas = document.getElementById('inspectionCanvas');
+            const ctx = canvas.getContext('2d');
+
+            ctx.drawImage(loadedImage, 0, 0, canvas.width, canvas.height);
+
+            const showBbox = document.getElementById('toggleBbox').checked;
+            const data = samplePresets[currentSampleKey] || samplePresets.good;
+            const activeBoxes = lastDetectedWeldBox ? [lastDetectedWeldBox] : (data.boxes || []);
+
+            if (showBbox && activeBoxes.length) {
+                activeBoxes.forEach(box => {
+                    const bx = box.x * canvas.width;
+                    const by = box.y * canvas.height;
+                    const bw = box.w * canvas.width;
+                    const bh = box.h * canvas.height;
+
+                    ctx.strokeStyle = box.color || '#f87171';
+                    ctx.lineWidth = 2;
+                    ctx.setLineDash([4, 2]);
+                    ctx.strokeRect(bx, by, bw, bh);
+                    ctx.setLineDash([]);
+
+                    ctx.fillStyle = box.color || '#f87171';
+                    ctx.fillRect(bx, by - 20, ctx.measureText(box.label || 'DEFECT').width + 12, 20);
+                    ctx.fillStyle = '#0f172a';
+                    ctx.font = 'bold 11px sans-serif';
+                    ctx.fillText(box.label || 'DEFECT', bx + 6, by - 6);
+                });
+            }
+        }
+
+        function runAIAnalysis() {
+            if (!loadedImage) {
+                alert('먼저 용접 이미지를 업로드하거나 샘플 이미지를 선택해 주세요.');
+                return;
+            }
+
+            const scanOverlay = document.getElementById('scanOverlay');
+            scanOverlay.classList.remove('hidden');
+
+            const btn = document.getElementById('analyzeBtn');
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fa-solid fa-spinner animate-spin"></i> <span>비드 비전 알고리즘 분석 중...</span>';
+
+            setTimeout(() => {
+                scanOverlay.classList.add('hidden');
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles"></i> <span>AI 용접 품질 측정 및 진단 시작</span>';
+                if (loadedImage) {
+                    const canvas = document.getElementById('inspectionCanvas');
+                    const ctx = canvas.getContext('2d');
+                    const analysisMetrics = computeImageMetrics(ctx, canvas.width, canvas.height);
+                    currentMetrics = analysisMetrics;
+                    currentSampleKey = classifyImage(analysisMetrics);
+                    document.getElementById('currentProcessBadge').innerText = `선택: ${currentProcess}`;
+                }
+                analysisCompleted = true;
+                setResultsVisible(true);
+                updateDashboardText();
+                drawOverlay();
+            }, 1200);
+        }
+
+        function updateDashboardText() {
+            const data = applyMetricsToPreset(currentSampleKey, currentMetrics);
+
+            document.getElementById('scoreText').innerText = `${data.score}%`;
+            document.getElementById('scoreCircle').setAttribute('stroke-dasharray', `${data.score}, 100`);
+
+            const badge = document.getElementById('passBadge');
+            badge.className = `px-2.5 py-1 rounded text-xs font-extrabold border tracking-wide ${data.statusClass}`;
+            badge.innerText = data.badgeText;
+
+            document.getElementById('defectCountText').innerText = `결함 ${data.defects.length}건 감지됨`;
+            document.getElementById('resultSummaryTitle').innerText = data.title;
+            document.getElementById('resultSummaryDesc').innerText = data.desc;
+
+            document.getElementById('metricBeadWidth').innerText = data.beadWidth;
+            document.getElementById('metricRoughness').innerText = data.roughness;
+            document.getElementById('metricDefectRate').innerText = data.defectRate;
+
+            const listContainer = document.getElementById('defectListContainer');
+            listContainer.innerHTML = '';
+            data.defects.forEach(def => {
+                const item = document.createElement('div');
+                item.className = 'flex items-center justify-between p-2.5 bg-slate-950/60 rounded border border-slate-800 text-xs';
+                item.innerHTML = `
+                    <div class="flex items-center gap-2">
+                        <i class="fa-solid ${def.icon}"></i>
+                        <div>
+                            <span class="font-bold text-slate-200 block">${def.name}</span>
+                            <span class="text-[10px] text-slate-400">위치: ${def.loc}</span>
+                        </div>
+                    </div>
+                    <span class="px-2 py-0.5 rounded text-[10px] font-bold ${def.severity === 'High' ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30' : 'bg-amber-500/20 text-amber-400 border border-amber-500/30'}">
+                        위험도: ${def.risk}
+                    </span>
+                `;
+                listContainer.appendChild(item);
+            });
+
+            const causeList = document.getElementById('causeList');
+            causeList.innerHTML = '';
+            const processCauses = data.causes[currentProcess] || data.causes.SMAW;
+            processCauses.forEach(c => {
+                const li = document.createElement('li');
+                li.innerText = c;
+                causeList.appendChild(li);
+            });
+
+            const recList = document.getElementById('recommendationList');
+            recList.innerHTML = '';
+            const processRecs = data.recommendations[currentProcess] || data.recommendations.SMAW;
+            processRecs.forEach(r => {
+                const li = document.createElement('li');
+                li.innerText = r;
+                recList.appendChild(li);
+            });
+
+            renderTutorFeedback();
+            renderHistoryTable();
+            updateRadarChart(data.radar);
+        }
+
+        function initRadarChart() {
+            const ctx = document.getElementById('qualityRadarChart').getContext('2d');
+            radarChartInstance = new Chart(ctx, {
+                type: 'radar',
+                data: {
+                    labels: ['비드 균일도', '표면 조도', '용입 깊이', '스패터 레벨', '기공 정밀도'],
+                    datasets: [{
+                        label: '품질 지수',
+                        data: [90, 85, 95, 90, 92],
+                        backgroundColor: 'rgba(6, 182, 212, 0.2)',
+                        borderColor: '#06b6d4',
+                        pointBackgroundColor: '#f59e0b',
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        r: {
+                            angleLines: { color: '#334155' },
+                            grid: { color: '#334155' },
+                            pointLabels: { color: '#94a3b8', font: { size: 10 } },
+                            ticks: { display: false, backdropColor: 'transparent' },
+                            suggestedMin: 0,
+                            suggestedMax: 100
+                        }
+                    },
+                    plugins: {
+                        legend: { display: false }
+                    }
+                }
+            });
+        }
+
+        function updateRadarChart(newData) {
+            if (radarChartInstance) {
+                radarChartInstance.data.datasets[0].data = newData;
+                radarChartInstance.update();
+            }
+        }
+
+    </script>
+</body>
+</html>
