@@ -1,0 +1,17 @@
+{
+  "name": "weld-ai-inspection",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "dotenv": "^18.0.5",
+    "express": "^5.2.1",
+    "openai": "^7.28.0"
+  }
+}

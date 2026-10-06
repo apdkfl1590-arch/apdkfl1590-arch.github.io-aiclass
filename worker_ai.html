@@ -231,7 +231,7 @@
         <section id="resultPanel" class="lg:col-span-7 flex flex-col gap-6 hidden">
 
             <p class="rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm leading-6 text-amber-100">
-                사진 분석은 밝기와 형상에 따른 시제품 추정입니다. 실제 합격·불량 판정과 결함 위치는 품질 담당자가 확인해 주세요.
+                사진은 AI 분석 서버로 전송됩니다. 결과는 참고용이며 실제 합격·불량 판정은 품질 담당자가 확인해 주세요.
             </p>
 
             <!-- Quality Score Header Card -->
@@ -431,11 +431,7 @@
 
     <script>
         const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
-        const average = (values) => values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : 0;
-        const standardDeviation = (values, meanValue = average(values)) => {
-            if (!values.length) return 0;
-            return Math.sqrt(values.reduce((sum, value) => sum + (value - meanValue) ** 2, 0) / values.length);
-        };
+        const WELD_API_ENDPOINT = '/api/weld-predict';
 
         // App State
         let currentProcess = 'SMAW';
@@ -443,6 +439,7 @@
         let currentSampleKey = 'good';
         let radarChartInstance = null;
         let loadedImage = null;
+        let currentAIResult = null;
         let webcamStream = null;
         let lastDetectedWeldBox = null;
         let analysisCompleted = false;
@@ -960,7 +957,7 @@
         }
 
         function saveInspectionHistory() {
-            const data = applyMetricsToPreset(currentSampleKey, currentMetrics);
+            const data = currentAIResult || applyMetricsToPreset(currentSampleKey, currentMetrics);
             const workerName = getInspectorName() || '미기재';
             const reportId = `report-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
             const entry = {
@@ -1378,6 +1375,15 @@
             updateWeldingMethodNotice();
         }
 
+        function clearMethodRecommendation() {
+            recommendedWeldingProcess = '';
+            const notice = document.getElementById('processRecommendationNotice');
+            if (notice) {
+                notice.textContent = '';
+                notice.classList.add('hidden');
+            }
+        }
+
         function updateWeldingMethodNotice() {
             const notice = document.getElementById('processRecommendationNotice');
             if (!notice || !recommendedWeldingProcess) return;
@@ -1400,6 +1406,10 @@
 
         function selectWeldingType(type, manualSelection = true) {
             currentProcess = type;
+            if (manualSelection && currentAIResult) {
+                currentAIResult = null;
+                setResultsVisible(false);
+            }
             const buttons = document.querySelectorAll('.welding-type-btn');
             buttons.forEach(btn => {
                 if (btn.dataset.type === type) {
@@ -1415,167 +1425,6 @@
             if (document.getElementById('resultPanel') && !document.getElementById('resultPanel').classList.contains('hidden')) {
                 updateDashboardText();
             }
-        }
-
-        function computeImageMetrics(ctx, w, h) {
-            const imageData = ctx.getImageData(0, 0, w, h).data;
-            const totalPixels = w * h;
-            let brightnessSum = 0;
-            let darkPixels = 0;
-            let brightPixels = 0;
-            let centralDefectPixels = 0;
-            let centralPixels = 0;
-            const rowCenters = [];
-            const rowWidths = [];
-
-            for (let y = 0; y < h; y += 2) {
-                let rowMin = w;
-                let rowMax = 0;
-                let rowDarkPixels = 0;
-                for (let x = 0; x < w; x += 2) {
-                    const index = (y * w + x) * 4;
-                    const r = imageData[index];
-                    const g = imageData[index + 1];
-                    const b = imageData[index + 2];
-                    const brightness = (r + g + b) / 3;
-                    brightnessSum += brightness;
-
-                    if (brightness < 70) {
-                        darkPixels += 1;
-                        rowDarkPixels += 1;
-                    }
-                    if (brightness > 180) {
-                        brightPixels += 1;
-                    }
-
-                    const isCentralBand = y > h * 0.2 && y < h * 0.8;
-                    if (isCentralBand) {
-                        centralPixels += 1;
-                        if (brightness < 110) {
-                            centralDefectPixels += 1;
-                        }
-                    }
-
-                    if (Math.abs(x - w * 0.5) < w * 0.35 && brightness < 150) {
-                        rowMin = Math.min(rowMin, x);
-                        rowMax = Math.max(rowMax, x);
-                    }
-                }
-
-                if (rowMax > rowMin) {
-                    const width = rowMax - rowMin;
-                    rowWidths.push(width);
-                    rowCenters.push((rowMin + rowMax) / 2);
-                }
-            }
-
-            const meanBrightness = brightnessSum / totalPixels;
-            const darkRatio = darkPixels / totalPixels;
-            const brightRatio = brightPixels / totalPixels;
-            const centralDefectRatio = centralDefectPixels / Math.max(1, centralPixels);
-
-            const meanWidth = average(rowWidths);
-            const widthStd = standardDeviation(rowWidths, meanWidth);
-            const centerStd = standardDeviation(rowCenters, average(rowCenters));
-
-            const beadUniformity = clamp(100 - (widthStd / Math.max(meanWidth, 1)) * 100, 0, 100);
-            const porosityRatio = clamp(centralDefectRatio * 1.8 + darkRatio * 0.9, 0, 1);
-            const spatterRatio = clamp(brightRatio * 3.0 + darkRatio * 0.25, 0, 1);
-            const undercutRisk = clamp((widthStd / Math.max(meanWidth, 1)) * 1.2 + (centerStd / Math.max(w, 1)) * 30, 0, 1);
-
-            let score = 100;
-            score -= porosityRatio * 58;
-            score -= spatterRatio * 26;
-            score -= undercutRisk * 42;
-            score -= Math.max(0, (meanBrightness - 125) / 20);
-            score = clamp(Math.round(score), 0, 100);
-
-            return {
-                score,
-                beadWidth: clamp(beadUniformity, 0, 100),
-                roughness: clamp(2.0 + darkRatio * 22 + brightRatio * 18 + undercutRisk * 12, 1.5, 12.5),
-                defectRate: clamp((porosityRatio * 38) + (spatterRatio * 24) + (undercutRisk * 20), 0, 100),
-                porosityRatio,
-                spatterRatio,
-                undercutRisk
-            };
-        }
-
-        function classifyImage(metrics) {
-            const riskMap = [
-                { key: 'porosity', score: metrics.porosityRatio * 5 + metrics.defectRate / 20 },
-                { key: 'spatter', score: metrics.spatterRatio * 4.5 + metrics.roughness / 7 },
-                { key: 'undercut', score: metrics.undercutRisk * 6 + (100 - metrics.beadWidth) / 12 },
-                { key: 'good', score: 1.0 }
-            ];
-
-            const best = riskMap.reduce((winner, candidate) => {
-                if (candidate.score > winner.score) return candidate;
-                return winner;
-            }, riskMap[0]);
-
-            if (best.key === 'good' && metrics.score >= 82) return 'good';
-            if (best.key === 'porosity' && metrics.porosityRatio >= 0.08) return 'porosity';
-            if (best.key === 'spatter' && metrics.spatterRatio >= 0.10) return 'spatter';
-            if (best.key === 'undercut' && metrics.undercutRisk >= 0.18) return 'undercut';
-            return 'good';
-        }
-
-        function estimateDefectRegion(ctx, w, h, metrics) {
-            const imageData = ctx.getImageData(0, 0, w, h).data;
-            const defectThreshold = 0.18 + metrics.undercutRisk * 0.4 + metrics.porosityRatio * 0.5 + metrics.spatterRatio * 0.3;
-            let minX = w, maxX = 0, minY = h, maxY = 0;
-            let found = false;
-
-            for (let y = Math.floor(h * 0.15); y < h * 0.85; y += 4) {
-                let rowMin = w;
-                let rowMax = 0;
-                let rowDefectCount = 0;
-
-                for (let x = 0; x < w; x += 4) {
-                    const index = (y * w + x) * 4;
-                    const r = imageData[index];
-                    const g = imageData[index + 1];
-                    const b = imageData[index + 2];
-                    const brightness = (r + g + b) / 3;
-                    const centerBias = Math.abs(x - w * 0.5) / (w * 0.5);
-                    const isDanger = brightness < 150 && (centerBias < 1.2 || defectThreshold > 0.3);
-
-                    if (isDanger) {
-                        rowDefectCount++;
-                        rowMin = Math.min(rowMin, x);
-                        rowMax = Math.max(rowMax, x);
-                    }
-                }
-
-                if (rowDefectCount > 12) {
-                    found = true;
-                    minX = Math.min(minX, rowMin);
-                    maxX = Math.max(maxX, rowMax);
-                    minY = Math.min(minY, y);
-                    maxY = Math.max(maxY, y + 16);
-                }
-            }
-
-            if (!found || metrics.score >= 86 && metrics.defectRate < 5) {
-                return null;
-            }
-
-            const padX = Math.max(18, w * 0.05);
-            const padY = Math.max(18, h * 0.08);
-            minX = clamp(minX - padX, 0, w - 1);
-            maxX = clamp(maxX + padX, 0, w);
-            minY = clamp(minY - padY, 0, h - 1);
-            maxY = clamp(maxY + padY, 0, h);
-
-            return {
-                x: minX / w,
-                y: minY / h,
-                w: (maxX - minX) / w,
-                h: (maxY - minY) / h,
-                color: '#f87171',
-                label: 'DEFECT'
-            };
         }
 
         function applyMetricsToPreset(key, metrics) {
@@ -1639,6 +1488,7 @@
 
         function loadSampleImage(key) {
             isSampleImage = true;
+            currentAIResult = null;
             currentSampleKey = key;
             document.getElementById('dropzone').classList.add('hidden');
             document.getElementById('reuploadBtn').classList.add('hidden');
@@ -1721,6 +1571,8 @@
 
         function processUploadedFile(file) {
             isSampleImage = false;
+            currentAIResult = null;
+            clearMethodRecommendation();
             const reader = new FileReader();
             reader.onload = function(e) {
                 const img = new Image();
@@ -1737,11 +1589,7 @@
                     document.getElementById('uploadedImageStatus').classList.remove('hidden');
 
                     analysisCompleted = false;
-                    const analysisMetrics = computeImageMetrics(ctx, canvas.width, canvas.height);
-                    currentMetrics = analysisMetrics;
-                    currentSampleKey = classifyImage(analysisMetrics);
-                    updateMethodRecommendation(analysisMetrics, true);
-                    lastDetectedWeldBox = estimateDefectRegion(ctx, canvas.width, canvas.height, analysisMetrics);
+                    lastDetectedWeldBox = null;
                     drawOverlay();
                     setResultsVisible(false);
                     updateDashboardText();
@@ -1749,14 +1597,6 @@
                 img.src = e.target.result;
             };
             reader.readAsDataURL(file);
-        }
-
-        function analyzeCustomUploadedImage(ctx, w, h) {
-            isSampleImage = false;
-            const analysisMetrics = computeImageMetrics(ctx, w, h);
-            currentMetrics = analysisMetrics;
-            currentSampleKey = classifyImage(analysisMetrics);
-            updateMethodRecommendation(analysisMetrics, true);
         }
 
         async function openWebcamModal() {
@@ -1780,6 +1620,8 @@
 
         function captureWebcam() {
             isSampleImage = false;
+            currentAIResult = null;
+            clearMethodRecommendation();
             const video = document.getElementById('webcamVideo');
             const canvas = document.createElement('canvas');
             canvas.width = 600;
@@ -1799,9 +1641,8 @@
                 document.getElementById('reuploadBtn').classList.remove('hidden');
                 document.getElementById('uploadedImageStatus').classList.remove('hidden');
 
-                analyzeCustomUploadedImage(inspectCanvas.getContext('2d'), 600, 340);
                 analysisCompleted = false;
-                lastDetectedWeldBox = estimateDefectRegion(inspectCanvas.getContext('2d'), 600, 340, currentMetrics);
+                lastDetectedWeldBox = null;
                 drawOverlay();
                 setResultsVisible(false);
                 updateDashboardText();
@@ -1819,7 +1660,9 @@
 
             const showBbox = document.getElementById('toggleBbox').checked;
             const data = samplePresets[currentSampleKey] || samplePresets.good;
-            const activeBoxes = lastDetectedWeldBox ? [lastDetectedWeldBox] : (data.boxes || []);
+            const activeBoxes = lastDetectedWeldBox
+                ? [lastDetectedWeldBox]
+                : (isSampleImage ? (data.boxes || []) : []);
 
             if (showBbox && activeBoxes.length) {
                 activeBoxes.forEach(box => {
@@ -1843,7 +1686,58 @@
             }
         }
 
-        function runAIAnalysis() {
+        function normalizeAIResult(result) {
+            if (!result || typeof result !== 'object') {
+                throw new Error('서버가 올바른 JSON 분석 결과를 반환하지 않았습니다.');
+            }
+
+            const score = Number(result.score);
+            const requiredStrings = ['badgeText', 'title', 'desc', 'beadWidth', 'roughness', 'defectRate'];
+            if (!Number.isFinite(score) || score < 0 || score > 100 ||
+                requiredStrings.some(key => typeof result[key] !== 'string' || !result[key].trim()) ||
+                !Array.isArray(result.defects)) {
+                throw new Error('서버 분석 결과의 형식이 올바르지 않습니다.');
+            }
+
+            const riskLevels = new Set(['low', 'medium', 'high']);
+            const defects = result.defects.map(defect => {
+                if (!defect || typeof defect.name !== 'string' || typeof defect.loc !== 'string' ||
+                    typeof defect.risk !== 'string' || !riskLevels.has(defect.risk.toLowerCase())) {
+                    throw new Error('서버 분석 결과의 결함 정보가 올바르지 않습니다.');
+                }
+                return {
+                    name: defect.name,
+                    loc: defect.loc,
+                    risk: defect.risk,
+                    severity: typeof defect.severity === 'string' ? defect.severity : defect.risk,
+                    icon: 'fa-triangle-exclamation'
+                };
+            });
+
+            let statusClass = 'bg-amber-500/20 text-amber-400 border border-amber-500/30';
+            if (result.badgeText.startsWith('PASS')) {
+                statusClass = 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30';
+            } else if (result.badgeText.startsWith('FAIL')) {
+                statusClass = 'bg-rose-500/20 text-rose-400 border border-rose-500/30';
+            }
+
+            return {
+                score,
+                badgeText: result.badgeText,
+                statusClass,
+                title: result.title,
+                desc: result.desc,
+                beadWidth: result.beadWidth,
+                roughness: result.roughness,
+                defectRate: result.defectRate,
+                defects,
+                causes: {},
+                recommendations: {},
+                radar: []
+            };
+        }
+
+        async function runAIAnalysis() {
             if (!loadedImage) {
                 alert('먼저 용접 이미지를 업로드하거나 샘플 이미지를 선택해 주세요.');
                 return;
@@ -1851,39 +1745,45 @@
 
             const scanOverlay = document.getElementById('scanOverlay');
             scanOverlay.classList.remove('hidden');
-
             const btn = document.getElementById('analyzeBtn');
             btn.disabled = true;
-            btn.innerHTML = '<i class="fa-solid fa-spinner animate-spin"></i> <span>비드 비전 알고리즘 분석 중...</span>';
+            btn.innerHTML = '<i class="fa-solid fa-spinner animate-spin"></i> <span>AI 서버에서 용접 사진 분석 중...</span>';
+            currentAIResult = null;
+            setResultsVisible(false);
 
-            setTimeout(() => {
+            try {
+                const canvas = document.getElementById('inspectionCanvas');
+                const image = canvas.toDataURL('image/jpeg', 0.9).split(',')[1];
+                const response = await fetch(WELD_API_ENDPOINT, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ image, processType: currentProcess })
+                });
+                const result = await response.json().catch(() => null);
+                if (!response.ok) {
+                    throw new Error(result && typeof result.error === 'string'
+                        ? result.error
+                        : `분석 서버 요청이 실패했습니다. (HTTP ${response.status})`);
+                }
+
+                currentAIResult = normalizeAIResult(result);
+                document.getElementById('currentProcessBadge').innerText = `선택: ${currentProcess}`;
+                analysisCompleted = true;
+                updateDashboardText();
+                setResultsVisible(true);
+                drawOverlay();
+            } catch (error) {
+                console.error('AI 용접 분석 요청 실패:', error);
+                alert(`AI 분석에 실패했습니다: ${error.message || '서버 연결 상태를 확인해 주세요.'}`);
+            } finally {
                 scanOverlay.classList.add('hidden');
                 btn.disabled = false;
                 btn.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles"></i> <span>AI 용접 품질 측정 및 진단 시작</span>';
-                if (loadedImage) {
-                    if (isSampleImage) {
-                        currentMetrics = getSampleAnalysisMetrics(currentSampleKey);
-                        lastDetectedWeldBox = samplePresets[currentSampleKey].boxes?.[0] || null;
-                    } else {
-                        const canvas = document.getElementById('inspectionCanvas');
-                        const ctx = canvas.getContext('2d');
-                        const analysisMetrics = computeImageMetrics(ctx, canvas.width, canvas.height);
-                        currentMetrics = analysisMetrics;
-                        currentSampleKey = classifyImage(analysisMetrics);
-                        lastDetectedWeldBox = estimateDefectRegion(ctx, canvas.width, canvas.height, analysisMetrics);
-                    }
-                    updateMethodRecommendation(currentMetrics, false);
-                    document.getElementById('currentProcessBadge').innerText = `선택: ${currentProcess}`;
-                }
-                analysisCompleted = true;
-                setResultsVisible(true);
-                updateDashboardText();
-                drawOverlay();
-            }, 1200);
+            }
         }
 
         function updateDashboardText() {
-            const data = applyMetricsToPreset(currentSampleKey, currentMetrics);
+            const data = currentAIResult || applyMetricsToPreset(currentSampleKey, currentMetrics);
 
             document.getElementById('scoreText').innerText = `${data.score}%`;
             document.getElementById('scoreCircle').setAttribute('stroke-dasharray', `${data.score}, 100`);
@@ -1905,25 +1805,31 @@
             data.defects.forEach(def => {
                 const item = document.createElement('div');
                 item.className = 'flex items-center justify-between p-2.5 bg-slate-950/60 rounded border border-slate-800 text-xs';
-                item.innerHTML = `
-                    <div class="flex items-center gap-2">
-                        <i class="fa-solid ${def.icon}"></i>
-                        <div>
-                            <span class="font-bold text-slate-200 block">${def.name}</span>
-                            <span class="text-[10px] text-slate-400">위치: ${def.loc}</span>
-                        </div>
-                    </div>
-                    <span class="px-2 py-0.5 rounded text-[10px] font-bold ${def.severity === 'High' ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30' : 'bg-amber-500/20 text-amber-400 border border-amber-500/30'}">
-                        위험도: ${def.risk}
-                    </span>
-                `;
+                const detail = document.createElement('div');
+                detail.className = 'flex items-center gap-2';
+                const icon = document.createElement('i');
+                icon.className = `fa-solid ${def.icon || 'fa-triangle-exclamation'}`;
+                const text = document.createElement('div');
+                const name = document.createElement('span');
+                name.className = 'font-bold text-slate-200 block';
+                name.textContent = def.name;
+                const location = document.createElement('span');
+                location.className = 'text-[10px] text-slate-400';
+                location.textContent = `위치: ${def.loc}`;
+                text.append(name, location);
+                detail.append(icon, text);
+
+                const risk = document.createElement('span');
+                risk.className = `px-2 py-0.5 rounded text-[10px] font-bold ${def.severity === 'High' ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30' : 'bg-amber-500/20 text-amber-400 border border-amber-500/30'}`;
+                risk.textContent = `위험도: ${def.risk}`;
+                item.append(detail, risk);
                 listContainer.appendChild(item);
             });
 
             const causeList = document.getElementById('causeList');
             causeList.innerHTML = '';
             const processCauses = data.causes[currentProcess] || data.causes.SMAW;
-            processCauses.forEach(c => {
+            (processCauses || []).forEach(c => {
                 const li = document.createElement('li');
                 li.innerText = c;
                 causeList.appendChild(li);
@@ -1932,15 +1838,28 @@
             const recList = document.getElementById('recommendationList');
             recList.innerHTML = '';
             const processRecs = data.recommendations[currentProcess] || data.recommendations.SMAW;
-            processRecs.forEach(r => {
+            (processRecs || []).forEach(r => {
                 const li = document.createElement('li');
                 li.innerText = r;
                 recList.appendChild(li);
             });
 
-            renderTutorFeedback();
+            const aiTutorFeedback = document.getElementById('aiTutorFeedback');
+            if (currentAIResult) {
+                aiTutorFeedback.textContent = 'AI 서버 응답에는 별도의 원인 분석 및 개선 가이드가 포함되지 않았습니다.';
+                const unavailableMessage = 'AI 서버 응답에 포함되지 않은 항목입니다.';
+                [causeList, recList].forEach(list => {
+                    const li = document.createElement('li');
+                    li.textContent = unavailableMessage;
+                    list.appendChild(li);
+                });
+                document.getElementById('qualityRadarCard').classList.add('hidden');
+            } else {
+                renderTutorFeedback();
+                document.getElementById('qualityRadarCard').classList.remove('hidden');
+            }
             renderHistoryTable();
-            updateRadarChart(data.radar);
+            if (!currentAIResult) updateRadarChart(data.radar);
         }
 
         function initRadarChart() {
