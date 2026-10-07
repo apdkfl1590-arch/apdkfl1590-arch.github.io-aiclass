@@ -68,9 +68,9 @@ app.post('/api/weld-predict', async (req, res) => {
           ]
         }`;
 
-        // Gemini 모델 호출 (gemini-2.5-flash 모델 사용)
+        // Gemini 모델 호출 (gemini-3.8-flash 모델 사용)
         const chatResp = await ai.models.generateContent({
-            model: 'gemini-2.5-flash',
+            model: 'gemini-3.8-flash',
             contents: [
                 {
                     text: `현재 적용된 용접 공법은 ${selectedProcess}이다. 이 용접 사진의 품질을 정밀 진단해 줘.`
