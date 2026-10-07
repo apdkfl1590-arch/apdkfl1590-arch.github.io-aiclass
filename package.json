@@ -6,10 +6,9 @@
   "scripts": {
     "start": "node server.js"
   },
-  "dependencies": {
-    "@google/genai": "^0.1.1", 
+"dependencies": {
+    "@google/genai": "latest",
     "dotenv": "^16.4.5",
-    "express": "^4.19.2",
-    "openai": "^4.0.0" 
+    "express": "^4.19.2"
   }
 }
