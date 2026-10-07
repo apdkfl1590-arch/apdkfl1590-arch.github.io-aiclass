@@ -37,9 +37,10 @@ for (const page of pages) {
 app.use(express.json({ limit: '10mb' }));
 
 const MODEL_CANDIDATES = [
-    'gemini-2.0-flash',
-    'gemini-flash-latest',
-    'gemini-2.5-flash-lite',
+    'gemini-3.5-flash-lite',
+    'gemini-3.1-flash-lite',
+    'gemini-3.6-flash',
+    'gemini-3.7-flash',
     'gemini-3.8-flash',
 ];
 
@@ -54,9 +55,12 @@ async function generateWithFallback(payloadBase) {
                 });
             } catch (error) {
                 lastError = error;
-                const busy =
-                    error?.status === 503 ||
-                    /high demand|UNAVAILABLE|overloaded/i.test(String(error?.message || ''));
+               const busy =
+          error?.status === 503 ||
+          error?.status === 404 ||
+          /high demand|UNAVAILABLE|overloaded|no longer available|NOT_FOUND/i.test(
+            String(error?.message || '')
+          );
                 if (busy && attempt < 2) {
                     await new Promise((r) => setTimeout(r, 800 * attempt));
                     continue;
