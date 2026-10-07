@@ -90,19 +90,31 @@ app.post('/api/weld-predict', async (req, res) => {
 
         const selectedProcess = processType || 'SMAW';
 
-        const systemInstruction = `너는 용접 품질 검사관이다. 사용자가 제공하는 용접 비드 사진과 공법(${selectedProcess})을 바탕으로 품질을 검사해라. 결과는 반드시 순수한 JSON 형식으로만 반환해야 한다:
-        {
-          "score": 85,
-          "badgeText": "PASS (합격)" 또는 "REWORK (재작업)" 또는 "FAIL (불합격)",
-          "title": "용접 상태를 요약하는 한 줄 제목",
-          "desc": "용접 상태에 대한 상세 설명",
-          "beadWidth": "92.4 %",
-          "roughness": "Ra 3.2 µm",
-          "defectRate": "2.1 %",
-          "defects": [
-            {"name": "기공 또는 스패터 또는 언더컷 등", "loc": "발생 위치", "risk": "Low 또는 Medium 또는 High", "severity": "Low 또는 High"}
-          ]
-        }`;
+                const systemInstruction = `너는 용접 품질 검사관이다. 사용자가 제공하는 용접 비드 사진과 공법(${selectedProcess})을 바탕으로 품질을 검사해라.
+결과는 반드시 순수한 JSON 한 개만 반환해라. 마크다운 코드블록(\`\`\`)이나 설명 문장은 절대 넣지 마라.
+
+반드시 아래 키를 모두 포함해라:
+{
+  "score": 0부터 100 사이 숫자,
+  "badgeText": "PASS (합격)" 또는 "REWORK (재작업)" 또는 "FAIL (불합격)",
+  "title": "한 줄 제목",
+  "desc": "상세 설명",
+  "beadWidth": "예: 92.4 %",
+  "roughness": "예: Ra 3.2 µm",
+  "defectRate": "예: 2.1 %",
+  "defects": [
+    {"name": "결함명", "loc": "위치", "risk": "Low 또는 Medium 또는 High", "severity": "Low 또는 High"}
+  ],
+  "causes": ["원인1", "원인2"],
+  "recommendations": ["조치1", "조치2"],
+  "tutorFeedback": "작업자에게 전달할 짧은 피드백 2~3문장"
+}
+
+중요 규칙:
+- causes, recommendations는 반드시 문자열 배열이다. 한 줄 문자열이나 객체로 쓰지 마라.
+- causes와 recommendations는 각각 2~4개 항목을 넣어라.
+- 공법 ${selectedProcess} 기준으로 구체적 원인과 현장 조치/파라미터 수정을 적어라.
+- 결함이 거의 없어도 유지·점검 포인트를 causes/recommendations에 넣어라.`;
 
         const chatResp = await generateWithFallback({
             contents: [
