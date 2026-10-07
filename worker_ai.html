@@ -1721,6 +1721,16 @@
                 statusClass = 'bg-rose-500/20 text-rose-400 border border-rose-500/30';
             }
 
+           const causes = Array.isArray(result.causes)
+                ? result.causes.filter(item => typeof item === 'string' && item.trim())
+                : [];
+            const recommendations = Array.isArray(result.recommendations)
+                ? result.recommendations.filter(item => typeof item === 'string' && item.trim())
+                : [];
+            const tutorFeedback = typeof result.tutorFeedback === 'string'
+                ? result.tutorFeedback.trim()
+                : '';
+
             return {
                 score,
                 badgeText: result.badgeText,
@@ -1731,8 +1741,9 @@
                 roughness: result.roughness,
                 defectRate: result.defectRate,
                 defects,
-                causes: {},
-                recommendations: {},
+                causes,
+                recommendations,
+                tutorFeedback,
                 radar: []
             };
         }
@@ -1827,34 +1838,62 @@
             });
 
             const causeList = document.getElementById('causeList');
-            causeList.innerHTML = '';
-            const processCauses = data.causes[currentProcess] || data.causes.SMAW;
-            (processCauses || []).forEach(c => {
-                const li = document.createElement('li');
-                li.innerText = c;
-                causeList.appendChild(li);
-            });
-
             const recList = document.getElementById('recommendationList');
-            recList.innerHTML = '';
-            const processRecs = data.recommendations[currentProcess] || data.recommendations.SMAW;
-            (processRecs || []).forEach(r => {
-                const li = document.createElement('li');
-                li.innerText = r;
-                recList.appendChild(li);
-            });
-
             const aiTutorFeedback = document.getElementById('aiTutorFeedback');
+
+            causeList.innerHTML = '';
+            recList.innerHTML = '';
+
             if (currentAIResult) {
-                aiTutorFeedback.textContent = 'AI 서버 응답에는 별도의 원인 분석 및 개선 가이드가 포함되지 않았습니다.';
-                const unavailableMessage = 'AI 서버 응답에 포함되지 않은 항목입니다.';
-                [causeList, recList].forEach(list => {
+                // 서버가 준 배열 그대로 사용
+                const causes = Array.isArray(data.causes) ? data.causes : [];
+                const recommendations = Array.isArray(data.recommendations) ? data.recommendations : [];
+
+                if (causes.length) {
+                    causes.forEach(c => {
+                        const li = document.createElement('li');
+                        li.textContent = c;
+                        causeList.appendChild(li);
+                    });
+                } else {
                     const li = document.createElement('li');
-                    li.textContent = unavailableMessage;
-                    list.appendChild(li);
-                });
+                    li.textContent = '추정 원인 정보가 없습니다.';
+                    causeList.appendChild(li);
+                }
+
+                if (recommendations.length) {
+                    recommendations.forEach(r => {
+                        const li = document.createElement('li');
+                        li.textContent = r;
+                        recList.appendChild(li);
+                    });
+                } else {
+                    const li = document.createElement('li');
+                    li.textContent = '개선 가이드 정보가 없습니다.';
+                    recList.appendChild(li);
+                }
+
+                aiTutorFeedback.textContent = data.tutorFeedback
+                    || data.desc
+                    || 'AI 분석 결과를 참고해 현장 기준에 맞게 최종 확인해 주세요.';
+
                 document.getElementById('qualityRadarCard').classList.add('hidden');
             } else {
+                // 샘플 이미지용 (공법별 객체 구조)
+                const processCauses = data.causes?.[currentProcess] || data.causes?.SMAW || [];
+                processCauses.forEach(c => {
+                    const li = document.createElement('li');
+                    li.textContent = c;
+                    causeList.appendChild(li);
+                });
+
+                const processRecs = data.recommendations?.[currentProcess] || data.recommendations?.SMAW || [];
+                processRecs.forEach(r => {
+                    const li = document.createElement('li');
+                    li.textContent = r;
+                    recList.appendChild(li);
+                });
+
                 renderTutorFeedback();
                 document.getElementById('qualityRadarCard').classList.remove('hidden');
             }
