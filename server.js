@@ -36,6 +36,39 @@ for (const page of pages) {
 
 app.use(express.json({ limit: '10mb' }));
 
+const MODEL_CANDIDATES = [
+    'gemini-2.0-flash',
+    'gemini-flash-latest',
+    'gemini-2.5-flash-lite',
+    'gemini-3.8-flash',
+];
+
+async function generateWithFallback(payloadBase) {
+    let lastError;
+    for (const model of MODEL_CANDIDATES) {
+        for (let attempt = 1; attempt <= 2; attempt++) {
+            try {
+                return await ai.models.generateContent({
+                    ...payloadBase,
+                    model,
+                });
+            } catch (error) {
+                lastError = error;
+                const busy =
+                    error?.status === 503 ||
+                    /high demand|UNAVAILABLE|overloaded/i.test(String(error?.message || ''));
+                if (busy && attempt < 2) {
+                    await new Promise((r) => setTimeout(r, 800 * attempt));
+                    continue;
+                }
+                if (busy) break;
+                throw error;
+            }
+        }
+    }
+    throw lastError;
+}
+
 app.post('/api/weld-predict', async (req, res) => {
     try {
         const { image, processType } = req.body ?? {};
@@ -52,8 +85,7 @@ app.post('/api/weld-predict', async (req, res) => {
         }
 
         const selectedProcess = processType || 'SMAW';
-        
-        // 시스템 지시사항 (System Instructions)
+
         const systemInstruction = `너는 용접 품질 검사관이다. 사용자가 제공하는 용접 비드 사진과 공법(${selectedProcess})을 바탕으로 품질을 검사해라. 결과는 반드시 순수한 JSON 형식으로만 반환해야 한다:
         {
           "score": 85,
@@ -68,9 +100,7 @@ app.post('/api/weld-predict', async (req, res) => {
           ]
         }`;
 
-        // Gemini 모델 호출 (gemini-3.8-flash 모델 사용)
-        const chatResp = await ai.models.generateContent({
-            model: 'gemini-3.8-flash',
+        const chatResp = await generateWithFallback({
             contents: [
                 {
                     text: `현재 적용된 용접 공법은 ${selectedProcess}이다. 이 용접 사진의 품질을 정밀 진단해 줘.`
@@ -78,7 +108,7 @@ app.post('/api/weld-predict', async (req, res) => {
                 {
                     inlineData: {
                         mimeType: 'image/jpeg',
-                        data: image // Base64 인코딩된 이미지 데이터
+                        data: image
                     }
                 }
             ],
@@ -98,7 +128,7 @@ app.post('/api/weld-predict', async (req, res) => {
         const cleanJsonText = jsonText.trim()
             .replace(/^```(?:json)?\s*/i, '')
             .replace(/\s*```$/, '');
-            
+
         res.json(JSON.parse(cleanJsonText));
     } catch (error) {
         console.error('AI 분석 서버 오류:', error);
