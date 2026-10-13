@@ -131,7 +131,7 @@ app.post('/api/weld-predict', async (req, res) => {
             config: {
                 systemInstruction: systemInstruction,
                 temperature: 0.2,
-                maxOutputTokens: 500,
+                maxOutputTokens: 1500,
                 responseMimeType: 'application/json'
             }
         });
